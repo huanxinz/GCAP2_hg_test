@@ -23,10 +23,10 @@
       ! DISIZE = size (in degrees) of a longitude grid box
       ! DJSIZE = size (in degrees) of a latitude  grid box
       !=================================================================
-#if   defined( GRID4x5 ) 
+#if   defined( GRID4x5 ) || defined( GRIDM23 ) 
       REAL*8, PARAMETER :: DISIZE = 5.0d0
       REAL*8, PARAMETER :: DJSIZE = 4.0d0
-#elif defined( GRID2x25 )
+#elif defined( GRID2x25 ) || defined( GRIDF40 )
       REAL*8, PARAMETER :: DISIZE = 2.5d0 
       REAL*8, PARAMETER :: DJSIZE = 2.0d0
 #elif defined( GRID1x125 )
@@ -97,6 +97,46 @@
       INTEGER, PARAMETER :: LLTROP_FIX = LLTROP     
       INTEGER, PARAMETER :: LLSTRAT    = 20
       REAL*8,  PARAMETER :: PTOP       = 0.002d0
+
+#elif defined( GISS ) && defined( GRIDM23 )
+
+      !-----------------------------------------------------------------
+      ! GISS: M23 (medium resolution, 23 vertical layers)
+      !-----------------------------------------------------------------
+      ! See RES_M23.F in GISS GCM source code
+      INTEGER            :: IGLOB      = 72
+      INTEGER            :: JGLOB      = 46
+      INTEGER            :: LGLOB      = 23
+      INTEGER            :: IIPAR
+      INTEGER            :: JJPAR
+      INTEGER            :: LLPAR
+      INTEGER, PARAMETER :: LLTROP     = 16
+      INTEGER, PARAMETER :: LLTROP_FIX = LLTROP
+      INTEGER, PARAMETER :: LLSTRAT    = 20    ! Stratopause = 1mb
+      REAL*8,  PARAMETER :: PSFMPT     = 834d0 ! Ps (984d0) - PTOP
+      REAL*8,  PARAMETER :: PTOP       = 150d0 ! Pressure at LS1
+      INTEGER, PARAMETER :: LS1        = 12    ! Vertical level of transition from 
+                                               !          pure sigma to pure fixed
+
+#elif defined( GISS ) && defined( GRIDF40 )
+
+      !-----------------------------------------------------------------
+      ! GISS: F40 (fine resolution, 40 vertical layers)
+      !-----------------------------------------------------------------
+      ! See RES_F40.F in GISS GCM source code
+      INTEGER            :: IGLOB      = 144
+      INTEGER            :: JGLOB      = 90
+      INTEGER            :: LGLOB      = 40
+      INTEGER            :: IIPAR
+      INTEGER            :: JJPAR
+      INTEGER            :: LLPAR
+      INTEGER, PARAMETER :: LLTROP     = 29
+      INTEGER, PARAMETER :: LLTROP_FIX = LLTROP
+      INTEGER, PARAMETER :: LLSTRAT    = 37    ! Stratopause = 1mb
+      REAL*8,  PARAMETER :: PSFMPT     = 834d0 ! Ps (984d0) - PTOP
+      REAL*8,  PARAMETER :: PTOP       = 150d0 ! Pressure at LS1
+      INTEGER, PARAMETER :: LS1        = 24    ! Vertical level of transition from 
+                                               !          pure sigma to pure fixed
 
 #elif defined( GEOS_4 ) && defined( GRID4x5 )
 
@@ -822,7 +862,7 @@
       IIPAR      = IGLOB            ! Set IIPAR to IGLOB parameter
       JJPAR      = JGLOB            ! Set JJPAR to JGLOB parameter
 
-#if defined( GCAP )
+#if defined( MODELE ) || defined( GCAP )
       LLPAR      = LGLOB            ! GCAP does not have a reduced grid option
 #else 
 

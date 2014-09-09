@@ -145,7 +145,7 @@
       INTEGER              :: ND50_JMIN,      ND50_JMAX
       INTEGER              :: ND50_LMIN,      ND50_LMAX
       INTEGER              :: HALFPOLAR
-      INTEGER, PARAMETER   :: CENTER180=1
+      INTEGER              :: CENTER180
       REAL*4               :: LONRES,         LATRES
       REAL*8               :: TAU0,           TAU1
       CHARACTER(LEN=20)    :: MODELNAME
@@ -838,6 +838,7 @@
       USE BPCH2_MOD,          ONLY : BPCH2
       USE BPCH2_MOD,          ONLY : GET_MODELNAME
       USE BPCH2_MOD,          ONLY : GET_HALFPOLAR
+      USE BPCH2_MOD,          ONLY : GET_CENTER180
       USE BPCH2_MOD,          ONLY : OPEN_BPCH2_FOR_WRITE
       USE ERROR_MOD,          ONLY : ALLOC_ERR
       USE GIGC_ErrCode_Mod
@@ -1386,6 +1387,7 @@
 !
       USE BPCH2_MOD,  ONLY : GET_MODELNAME
       USE BPCH2_MOD,  ONLY : GET_HALFPOLAR
+      USE BPCH2_MOD,  ONLY : GET_CENTER180
       USE ERROR_MOD,  ONLY : ALLOC_ERR
       USE ERROR_MOD,  ONLY : ERROR_STOP
       USE GRID_MOD,   ONLY : GET_XOFFSET
@@ -1559,6 +1561,7 @@
       LATRES    = DJSIZE
       MODELNAME = GET_MODELNAME()
       HALFPOLAR = GET_HALFPOLAR()
+      CENTER180 = GET_CENTER180()
 
       ! Reset offsets to global values for bpch write
       I0        = GET_XOFFSET( GLOBAL=.TRUE. )

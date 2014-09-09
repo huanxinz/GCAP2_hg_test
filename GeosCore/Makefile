@@ -247,7 +247,7 @@ tomexe:                                               # Build executable
 	cp -f $(TOM) $(BIN)
 
 clean:                                             # Remove files here
-	rm -f *.o *.mod geos geosapm
+	rm -f *.i *.i90 *.o *.mod geos geosapm
 
 distclean:                                         # Synonym for "realclean"
 	@$(MAKE) realclean
@@ -324,7 +324,8 @@ a3_read_mod.o               : a3_read_mod.F                                  \
                               diag_mod.o
 
 a6_read_mod.o               : a6_read_mod.F                                  \
-                              dao_mod.o               diag_mod.o              
+                              dao_mod.o               diag_mod.o             \
+                              geom_giss_mod.o         FFT72.o 
 
 acetone_mod.o               : acetone_mod.F                                  \
                               diag_mod.o              megan_mod.o 
@@ -482,7 +483,8 @@ cleanup.o                   : cleanup.F                                      \
                               uvalbedo_mod.o          vistas_anthro_mod.o    \
                               wetscav_mod.o           tpcore_fvdas_mod.o     \
                               tpcore_geos5_window_mod.o                      \
-                              tpcore_geosfp_window_mod.o
+                              tpcore_geosfp_window_mod.o                     \
+                              diag_mass_flux_qus.o
 
 cldice_HBrHOBr_rxn.o        : cldice_HBrHOBr_rxn.F
 
@@ -496,7 +498,8 @@ convection_mod.o            : convection_mod.F                               \
                               diag_mod.o              depo_mercury_mod.o     \
                               fvdas_convect_mod.o     wetscav_mod.o          \
                               gcap_convect_mod.o      mercury_mod.o          \
-                              tracer_mod.o            tracerid_mod.o
+                              tracer_mod.o            tracerid_mod.o         \
+                              giss_convect_mod.o
 
 dao_mod.o                   : dao_mod.F                                      \
                               logical_mod.o
@@ -506,6 +509,8 @@ decomp.o                    : decomp.F
 depo_mercury_mod.o          : depo_mercury_mod.F                             \
                               dao_mod.o               diag_mod.o             \
                               logical_mod.o           tracerid_mod.o         
+
+diag_mass_flux_qus.o        : diag_mass_flux_qus.F
 
 diag03_mod.o                : diag03_mod.F                                   \
                               logical_mod.o           tracerid_mod.o
@@ -525,7 +530,8 @@ diag3.o                     : diag3.F                                        \
                               diag56_mod.o            diag_pl_mod.o          \
                               depo_mercury_mod.o      drydep_mod.o           \
                               logical_mod.o           tomas_mod.o            \
-                              tracerid_mod.o          wetscav_mod.o
+                              tracerid_mod.o          wetscav_mod.o          \
+                              diag_mass_flux_qus.o
 
 diag41_mod.o                : diag41_mod.F                                   \
                               pbl_mix_mod.o
@@ -652,6 +658,8 @@ fast_jx_mod.o               : fast_jx_mod.F                                  \
                               chemgrid_mod.o          dao_mod.o              \
                               toms_mod.o
 
+FFT72.o                     : FFT72.F
+
 future_emissions_mod.o      : future_emissions_mod.F
 
 fvdas_convect_mod.o         : fvdas_convect_mod.F                            \
@@ -697,6 +705,8 @@ gcap_read_mod.o             : gcap_read_mod.F                                \
 
 geia_mod.o                  : geia_mod.F
 
+geom_giss_mod.o             : geom_giss_mod.F90
+
 geosfp_read_mod.o           : geosfp_read_mod.F90                            \
                               dao_mod.o               diag_mod.o
 
@@ -719,6 +729,8 @@ gfed3_biomass_mod.o         : gfed3_biomass_mod.F                            \
 gigc_environment_mod.o      : gigc_environment_mod.F90                       \
 			      logical_mod.o           tracer_mod.o           \
                               vdiff_pre_mod.o
+
+giss_convect_mod.o          : giss_convect_mod.F      diag_mod.o
 
 global_bc_mod.o             : global_bc_mod.F
 
@@ -952,6 +964,10 @@ pops_mod.o           	    : pops_mod.F    	                             \
 
 precipfrac.o                : precipfrac.F
 
+qus_mod.o                   : qus_mod.F90                                    \
+                              dao_mod.o               geom_giss_mod.o        \
+                              diag_mass_flux_qus.o    chemgrid_mod.o
+
 rcp_mod.o                   : rcp_mod.F                                      \
                               diag_mod.o              tracerid_mod.o         \
                               tracer_mod.o
@@ -1102,7 +1118,8 @@ transport_mod.o             : transport_mod.F                                \
                               tpcore_geos5_window_mod.o                      \
                               tpcore_geosfp_window_mod.o                     \
                               pjc_pfix_geos5_window_mod.o                    \
-                              pjc_pfix_geosfp_window_mod.o
+                              pjc_pfix_geosfp_window_mod.o                   \
+                              qus_mod.o               diag_mass_flux_qus.o  
 
 update.o                    : update.F
 

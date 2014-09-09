@@ -141,6 +141,7 @@
 #  19 Mar 2014 - R. Yantosca - Restore GTMM compilation funcitonality
 #  19 Mar 2014 - R. Yantosca - Add more visible comment section dividers
 #  20 Mar 2014 - R. Yantosca - Bug fix: "+= -DDEBUG" instead of ":= -DDEBUG"
+#  06 Jul 2014 - L. Murray   - Add GCAP2 options
 #EOP
 #------------------------------------------------------------------------------
 #BOC
@@ -158,10 +159,10 @@ SHELL          :=/bin/bash
 ERR_CMPLR      :="Select a compiler: COMPILER=ifort, COMPILER=pgi"
 
 # Error message for bad MET input
-ERR_MET        :="Select a met field: MET=gcap, MET=geos4, MET=geos5, MET=merra, MET=geos-fp)"
+ERR_MET        :="Select a met field: MET=geos4, MET=geos5, MET=merra, MET=geos-fp, MET=ModelE, MET=Model3, MET=gcap)"
 
 # Error message for bad GRID input
-ERR_GRID       :="Select a horizontal grid: GRID=4x5. GRID=2x25, GRID=05x0666, GRID=025x03125"
+ERR_GRID       :="Select a horizontal grid: GEOS: GRID=4x5. GRID=2x25, GRID=05x0666, GRID=025x03125; GISS: GRID=M23, GRID=F40"
 
 # Error message for bad NEST input
 ERR_NEST       :="Select a nested grid: NEST=ch, NEST=eu, NEST=na"
@@ -287,33 +288,55 @@ ifeq ($(shell [[ "$(MET)" =~ $(REGEXP) ]] && echo true),true)
 USER_DEFS      += -DGCAP
 endif
 
+# %%%%% ModelE %%%%%
+REGEXP         :=(^[Mm][Oo][Dd][Ee][Ll][Ee])
+ifeq ($(shell [[ "$(MET)" =~ $(REGEXP) ]] && echo true),true)
+USER_DEFS      += -DGISS -DMODELE
+REGEXP         :=(^[Yy][Ee][Ss])
+ifeq ($(shell [[ "$(ICECAP)" =~ $(REGEXP) ]] && echo true),true)
+USER_DEFS      += -DICECAP
+ifeq ($(shell [[ "$(UCX)" =~ $(REGEXP) ]] && echo true),true)
+CHEM           :=UCX_ICECAP
+endif
+endif
+endif
+
+# %%%%% Model3 %%%%%
+REGEXP         :=(^[Mm][Oo][Dd][Ee][Ll][3])
+ifeq ($(shell [[ "$(MET)" =~ $(REGEXP) ]] && echo true),true)
+USER_DEFS      += -DGISS -DMODEL3
+endif
+
 # %%%%% GEOS-4 %%%%%
 REGEXP         :=((^[Gg][Ee][Oo][Ss])?4|.4)
 ifeq ($(shell [[ "$(MET)" =~ $(REGEXP) ]] && echo true),true)
-USER_DEFS      += -DGEOS_4
+USER_DEFS      += -DGEOS -DGEOS_4
 endif
 
 # %%%%% GEOS-5 %%%%%
 REGEXP         :=((^[Gg][Ee][Oo][Ss])?5|.5)
 ifeq ($(shell [[ "$(MET)" =~ $(REGEXP) ]] && echo true),true)
-USER_DEFS      += -DGEOS_5
+USER_DEFS      += -DGEOS -DGEOS_5
 endif
 
 # %%%%% MERRA %%%%%
 REGEXP         :=(^[Mm][Ee][Rr][Rr][Aa])
 ifeq ($(shell [[ "$(MET)" =~ $(REGEXP) ]] && echo true),true)
-USER_DEFS      += -DMERRA
+USER_DEFS      += -DGEOS -DMERRA
 endif
 
 # %%%%% GEOS-FP %%%%%
 REGEXP         :=(^[Gg][Ee][Oo][Ss][Ff][Pp])|(^[Gg][Ee][Oo][Ss].[Ff][Pp])
 ifeq ($(shell [[ "$(MET)" =~ $(REGEXP) ]] && echo true),true)
-USER_DEFS      += -DGEOS_FP
+USER_DEFS      += -DGEOS -DGEOS_FP
 endif
 
-# %%%%% REDUCED VERTICAL GRID (default, unless specified otherwise) %%%%
+# %%%%% REDUCED VERTICAL GRID (default for GEOS, unless specified otherwise) %%%%
 ifndef NO_REDUCED
+REGEXP         :=(^[Mm]|^[Oo][Dd][Ee][Ll][Ee])
+ifneq ($(shell [[ "$(MET)" =~ $(REGEXP) ]] && echo true),true)
 USER_DEFS      += -DGRIDREDUCED
+endif
 else
 REGEXP         :=(^[Yy]|^[Yy][Ee][Ss])
 ifeq ($(shell [[ "$(NO_REDUCED)" =~ $(REGEXP) ]] && echo true),true)
@@ -321,7 +344,7 @@ endif
 endif
 
 # %%%%% ERROR CHECK!  Make sure our MET selection is valid! %%%%%
-REGEXP         :=(\-DGCAP|\-DGEOS_4|\-DGEOS_5|\-DMERRA|\-DGEOS_FP)
+REGEXP         :=(\-DGCAP|\-DMODELE|\-DMODEL3|\-DGEOS_4|\-DGEOS_5|\-DMERRA|\-DGEOS_FP)
 ifneq ($(shell [[ "$(USER_DEFS)" =~ $(REGEXP) ]] && echo true),true)
 $(error $(ERR_MET))
 endif
@@ -407,8 +430,29 @@ USER_DEFS      += -DGRID025x03125
 endif
 endif
 
+# %%%%% GISS Model Resolutions %%%%%
+REGEXP         :=(^([Mm][Oo][Dd][Ee][Ll])?[Ee]|3)
+
+ifeq ($(shell [[ "$(MET)" =~ $(REGEXP) ]] && echo true),true)
+
+# M23 is GISS medium (4x5) horizontal with 23 vertical layers
+REGEXP         :=(^[Mm]23|^[Mm].23|(^4.5|^4\.0.5\.0))
+ifeq ($(shell [[ "$(GRID)" =~ $(REGEXP) ]] && echo true),true)
+USER_DEFS      += -DGRIDM23
+endif
+
+# F40 is GISS fine (2x2.5) horizontal with 40 vertical layers
+REGEXP         :=(^[Ff]40|^[Ff].40|(^2.25|^2.2\.5|^2\.0.2\.5))
+ifeq ($(shell [[ "$(GRID)" =~ $(REGEXP) ]] && echo true),true)
+USER_DEFS      += -DGRIDF40
+endif
+
+endif # GISS Model
+
+
+
 # %%%%% ERROR CHECK!  Make sure our GRID selection is valid! %%%%%
-REGEXP         := ((\-DGRID)?4x5|2x25|1x125|05x0666|025x03125)
+REGEXP         := ((\-DGRID)?M23|F40|4x5|2x25|1x125|05x0666|025x03125)
 ifneq ($(shell [[ "$(USER_DEFS)" =~ $(REGEXP) ]] && echo true),true)
 $(error $(ERR_GRID))
 endif
@@ -506,6 +550,27 @@ endif
 # Specify year of tagged O3 prod/loss data
 ifdef TAGO3YR
 USER_DEFS      += -DUSE_THIS_O3_YEAR=$(TAGO3YR)
+endif
+
+#------------------------------------------------------------------------------
+# Special transport settings
+#------------------------------------------------------------------------------
+
+# If not specified, default GISS advection is QUS
+ifndef QUS
+REGEXP         :=(^[Mm][Oo][Dd][Ee][Ll][Ee])
+ifeq ($(shell [[ "$(MET)" =~ $(REGEXP) ]] && echo true),true)
+USER_DEFS      += -DQUS
+else
+USER_DEFS      += -DTPCORE
+endif
+else
+REGEXP         :=(^[Yy]|^[Yy][Ee][Ss])
+ifeq ($(shell [[ "$(QUS)" =~ $(REGEXP) ]] && echo true),true)
+USER_DEFS      += -DQUS
+else
+USER_DEFS      += -DTPCORE
+endif
 endif
 
 #------------------------------------------------------------------------------

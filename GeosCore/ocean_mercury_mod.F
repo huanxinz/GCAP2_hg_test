@@ -382,7 +382,7 @@
       ! ratio of aerosol molecular weight / air molecular weight
       CU = AERO_MW / AIR_MW   !  [kg aerosol / kg air]
 
-#if defined( GRID4x5 ) || defined( GRID2x25 )
+#if defined( GRID4x5 ) || defined( GRID2x25 ) || defined( GRIDM23 ) || defined( GRIDF40 )
       ! tropospheric aerosols (v8-02-03, GEOS5, 4x5)
       FILENAME = TRIM( DATA_DIR )   //
      &           'mercury_201007/Hg_partitioning/' //
@@ -506,10 +506,10 @@
         !       as ppb, so only 4x5 needs to be scaled by 1d9.
         !       (hma, 20120104)
         ! 0..5x0.666 file is regridded from 4x5 file, yzh, 12/15/12
-#if defined( GRID4x5 ) || defined( GRID05x0666 )
+#if defined( GRID4x5 ) || defined( GRID05x0666 ) || defined( GRIDM23 )
         BULK_CONC(I,J,L) = 1d9 * ( BULK_CONC(I,J,L) *
      &                     State_Met%AIRDEN(L,I,J)  )
-#elif defined( GRID2x25 )
+#elif defined( GRID2x25 ) || defined( GRIDF40 )
         BULK_CONC(I,J,L) = ( BULK_CONC(I,J,L) * State_Met%AIRDEN(L,I,J))
 #endif 
 
@@ -2909,7 +2909,7 @@
       JFIRST    = GET_YOFFSET( GLOBAL=.TRUE. ) + 1
       LFIRST    = 1
       HALFPOLAR = GET_HALFPOLAR()
-      CENTER180 = 1
+      CENTER180 = GET_CENTER180()
       LONRES    = DISIZE
       LATRES    = DJSIZE
       MODELNAME = GET_MODELNAME()

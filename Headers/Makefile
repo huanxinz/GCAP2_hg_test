@@ -86,7 +86,7 @@ lib: $(OBJ)
 	mv libHeaders.a $(LIB)
 
 clean:
-	rm -f *.o *.mod
+	rm -f *.i *.i90 *.o *.mod
 
 help:
 	@$(MAKE) -C $(HELP)

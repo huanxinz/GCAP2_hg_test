@@ -152,7 +152,7 @@
       INTEGER            :: ND49_FREQ,      ND49_NI
       INTEGER            :: ND49_NJ,        ND49_NL
       INTEGER            :: HALFPOLAR
-      INTEGER, PARAMETER :: CENTER180=1 
+      INTEGER            :: CENTER180 
       REAL*4             :: LONRES,         LATRES
       CHARACTER(LEN=20)  :: MODELNAME
       CHARACTER(LEN=40)  :: RESERVED = ''
@@ -1802,6 +1802,7 @@
 !
       USE BPCH2_MOD, ONLY : GET_MODELNAME
       USE BPCH2_MOD, ONLY : GET_HALFPOLAR
+      USE BPCH2_MOD, ONLY : GET_CENTER180
       USE GRID_MOD,  ONLY : GET_XOFFSET
       USE GRID_MOD,  ONLY : GET_YOFFSET
       USE GRID_MOD,  ONLY : ITS_A_NESTED_GRID
@@ -1964,7 +1965,8 @@
       LATRES    = DJSIZE
       MODELNAME = GET_MODELNAME()
       HALFPOLAR = GET_HALFPOLAR()
-      
+      CENTER180 = GET_CENTER180()
+
       ! Reset grid offsets to global values for bpch write
       I0        = GET_XOFFSET( GLOBAL=.TRUE. )
       J0        = GET_YOFFSET( GLOBAL=.TRUE. )      

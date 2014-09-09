@@ -131,7 +131,7 @@ realclean:
 	@$(MAKE) -C standard clean
 	@$(MAKE) -C SOA clean
 	@$(MAKE) -C UCX clean
-
+	@$(MAKE) -C UCX_ICECAP clean
 help:
 	@$(MAKE) -C $(HELP) 
 

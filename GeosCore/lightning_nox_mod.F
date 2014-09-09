@@ -119,8 +119,15 @@
 
       ! Parameters
       INTEGER, PARAMETER   :: NLTYPE        = 4
+#if defined( MODELE ) || defined( GCAP )
+      ! Use 6.3 Tg N a-1 for PD, which is about 310 mol/flash
+      REAL*8,  PARAMETER   :: RFLASH_MIDLAT = 6.3d12 * 6.022d23 / 14d0 / 
+     &                          ( 45.8658d0 * 3600d0 * 24d0 * 365.25d0 )
+      REAL*8,  PARAMETER   :: RFLASH_TROPIC = RFLASH_MIDLAT
+#else
       REAL*8,  PARAMETER   :: RFLASH_MIDLAT = 3.011d26   ! 500 mol/flash
       REAL*8,  PARAMETER   :: RFLASH_TROPIC = 1.566d26   ! 260 mol/flash
+#endif
       REAL*8,  PARAMETER   :: EAST_WEST_DIV = -30d0
       REAL*8,  PARAMETER   :: WEST_NS_DIV   =  23d0
       REAL*8,  PARAMETER   :: EAST_NS_DIV   =  35d0
@@ -213,7 +220,7 @@
       REAL*8        :: RATE_SAVE, REDIST,      T1,       T2
       REAL*8        :: TOTAL,     TOTAL_CG,    TOTAL_IC, X       
       REAL*8        :: YMID,      Z_IC,        Z_CG,     ZUP
-      REAL*8        :: XMID
+      REAL*8        :: XMID,      GLOB_FR
       REAL*8        :: VERTPROF(LLPAR)
 
       ! Pointers
@@ -224,6 +231,8 @@
       !=================================================================
       ! LIGHTNING begins here!
       !=================================================================
+
+      GLOB_FR = 0d0
 
       ! First-time initialization
       IF ( FIRST ) THEN
@@ -690,6 +699,8 @@
             ! equals that of the climatology. (ltm, 09/24/07)
             RATE = RATE * OTD_LIS_SCALE
 
+            ! GLOB_FR  = GLOB_FR + RATE / 6d0 / 3600d0 ! flashes s-1
+
             !-----------------------------------------------------------
             ! (6b) Compute cloud-ground/total flash ratio
             !-----------------------------------------------------------
@@ -792,6 +803,8 @@
       NULLIFY( BXHEIGHT )
       NULLIFY( CLDTOPS  )
       NULLIFY( T        )
+          
+      ! WRITE(6,*) 'Global Flash Rate (fl s-1): ',GLOB_FR
 
       END SUBROUTINE LIGHTNING
 !EOC
@@ -1504,9 +1517,9 @@
       ! from May 1995 through Dec 2005.  Slight difference when
       ! averaging over different resolutions. (ltm, 09/24/07, 11/14/08)
       !=================================================================
-#if   defined( GRID2x25 ) 
+#if   defined( GRID2x25 ) || defined( GRIDF40 )
       REAL*8, PARAMETER     :: ANN_AVG_FLASHRATE = 45.8650d0
-#elif defined( GRID4x5  )
+#elif defined( GRID4x5  ) || defined( GRIDM23 )
       REAL*8, PARAMETER     :: ANN_AVG_FLASHRATE = 45.8658d0
 #elif defined( GRID1x125 )
       REAL*8, PARAMETER     :: ANN_AVG_FLASHRATE = 45.8655d0
@@ -1692,14 +1705,33 @@
       !---------------------------------------
       BETA = ANN_AVG_FLASHRATE / 29.359449d0
 
-#elif   defined( GCAP )
+#elif defined( GCAP )
       
       !---------------------------------------
       ! GCAP: 4 x 5 global simulation
       !---------------------------------------
       BETA = ANN_AVG_FLASHRATE / 48.681763d0
 
+#elif defined( GISS ) && defined( GRIDM23 )
+
+      !---------------------------------------
+      ! GISS M23 global simulation
+      !---------------------------------------
+      BETA = ANN_AVG_FLASHRATE / 6.5588969d0
+
+#elif defined( GISS ) && defined( GRIDF40 )
+
+      !---------------------------------------
+      ! GISS F40 global simulation
+      !---------------------------------------
+      BETA = 1d0
+
 #endif
+
+      WRITE( 6,* ) 'ANN_AVG_FLASHRATE: ', ANN_AVG_FLASHRATE
+      WRITE( 6,* ) 'Unscaled: ', ANN_AVG_FLASHRATE/BETA
+      WRITE( 6,* ) 'BETA: ',BETA
+
 
       IF ( BETA .eq. 1d0 ) THEN
 

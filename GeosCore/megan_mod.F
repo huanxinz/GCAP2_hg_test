@@ -2019,6 +2019,7 @@
       REAL*8                  ::  MBO2CARBON
       !evf, acetone update (5/24/2011)
       REAL*8                  ::  ACET2CARBON
+      CHARACTER(LEN=4)        ::  MTYPE
 
       !
       ! Note, where it is written as [ug C/m2/hr] think of C = compound
@@ -2044,6 +2045,11 @@
       ! evf, acetone update (5/24/2011)
       ACET2CARBON  =  36d0 /  58d0
 
+#if defined( GISS )
+      MTYPE = 'giss'
+#else
+      MTYPE = 'geos'
+#endif
       
       !---------------------------------------------
       ! Read in ISOPRENE Annual Emission Factors
@@ -2051,7 +2057,7 @@
 
       ! 1x1 file name
       FILENAME = TRIM( DATA_DIR_1x1 ) //
-     &   'MEGAN_200909/MEGANv2.1_AEF_ISOPRENE.geos.1x1'
+     &   'MEGAN_200909/MEGANv2.1_AEF_ISOPRENE.'//MTYPE//'.1x1'
 
       ! Echo info
       WRITE( 6, 100 ) TRIM( FILENAME )
@@ -2099,7 +2105,8 @@
 
       ! 1x1 file name
       FILENAME = TRIM( DATA_DIR_1x1 ) //
-     &  TRIM( MEGAN_SUBDIR ) // 'MEGANv2.1_AEF_MONOTERPENES.geos.1x1'
+     &  TRIM( MEGAN_SUBDIR ) // 'MEGANv2.1_AEF_MONOTERPENES.' //
+     &     MTYPE//'.1x1'
 
       ! Echo info
       WRITE( 6, 100 ) TRIM( FILENAME )
@@ -2142,7 +2149,7 @@
 
       ! 1x1 file name
       FILENAME = TRIM( DATA_DIR_1x1 ) //
-     &    TRIM( MEGAN_SUBDIR ) // 'MEGANv2.1_AEF_MBO.geos.1x1'
+     &    TRIM( MEGAN_SUBDIR ) // 'MEGANv2.1_AEF_MBO.'//MTYPE//'.1x1'
 
       ! Echo info
       WRITE( 6, 100 ) TRIM( FILENAME )
@@ -2188,7 +2195,7 @@
       ! Base emission factors in ug(acetone)/m2/hr (evf, 5/24/2011 -
       ! AEF file from dbm)
       FILENAME = TRIM( DATA_DIR_1x1 ) //
-     &    TRIM( MEGAN_SUBDIR ) // 'MEGANv2.1_AEF_ACET.geos.1x1'
+     &    TRIM( MEGAN_SUBDIR ) // 'MEGANv2.1_AEF_ACET.'//MTYPE//'.1x1'
 
       ! Echo info
       WRITE( 6, 100 ) TRIM( FILENAME )
@@ -2227,7 +2234,11 @@
 
       ! 1x1 file name
       FILENAME = TRIM( DATA_DIR_1x1 ) //
-     &           'MEGAN_200510/MEGAN_AEF_MTP.geos.1x1' 
+#if defined( GISS ) || defined( GCAP )
+     &    TRIM( MEGAN_SUBDIR ) // 'MEGANv2.1_AEF_MTP.giss.1x1'
+#else
+     &           'MEGAN_200510/MEGAN_AEF_MTP.'//MTYPE//'.1x1' 
+#endif
 
       ! Echo info
       WRITE( 6, 100 ) TRIM( FILENAME )
@@ -2272,7 +2283,8 @@
 
       ! 1x1 file name
       FILENAME = TRIM( DATA_DIR_1x1 ) //
-     &   TRIM( MEGAN_SUBDIR ) // 'MEGANv2.1_AEF_ALPHA_PINENE.geos.1x1' 
+     &   TRIM( MEGAN_SUBDIR ) // 'MEGANv2.1_AEF_ALPHA_PINENE.'//
+     &   MTYPE//'.1x1' 
 
       ! Echo info
       WRITE( 6, 100 ) TRIM( FILENAME )
@@ -2313,7 +2325,8 @@
 
       ! 1x1 file name
       FILENAME = TRIM( DATA_DIR_1x1 ) //
-     &     TRIM( MEGAN_SUBDIR ) // 'MEGANv2.1_AEF_BETA_PINENE.geos.1x1' 
+     &     TRIM( MEGAN_SUBDIR ) // 'MEGANv2.1_AEF_BETA_PINENE.'//
+     &     MTYPE//'.1x1' 
 
       ! Echo info
       WRITE( 6, 100 ) TRIM( FILENAME )
@@ -2354,7 +2367,8 @@
 
       ! 1x1 file name
       FILENAME = TRIM( DATA_DIR_1x1 ) //
-     &   TRIM( MEGAN_SUBDIR ) // 'MEGANv2.1_AEF_LIMONENE.geos.1x1' 
+     &   TRIM( MEGAN_SUBDIR ) // 'MEGANv2.1_AEF_LIMONENE.'//
+     &   MTYPE//'.1x1' 
 
       ! Echo info
       WRITE( 6, 100 ) TRIM( FILENAME )
@@ -2395,7 +2409,8 @@
 
       ! 1x1 file name
       FILENAME = TRIM( DATA_DIR_1x1 ) //
-     &   TRIM( MEGAN_SUBDIR ) // 'MEGANv2.1_AEF_SABINENE.geos.1x1' 
+     &   TRIM( MEGAN_SUBDIR ) // 'MEGANv2.1_AEF_SABINENE.'//
+     &   MTYPE//'.1x1' 
 
       ! Echo info
       WRITE( 6, 100 ) TRIM( FILENAME )
@@ -2436,7 +2451,8 @@
 
       ! 1x1 file name
       FILENAME = TRIM( DATA_DIR_1x1 ) //
-     &   TRIM( MEGAN_SUBDIR ) // 'MEGANv2.1_AEF_MYRCENE.geos.1x1' 
+     &     TRIM( MEGAN_SUBDIR ) // 'MEGANv2.1_AEF_MYRCENE.'//
+     &     MTYPE//'.1x1' 
 
       ! Echo info
       WRITE( 6, 100 ) TRIM( FILENAME )
@@ -2478,7 +2494,8 @@
 
       ! 1x1 file name
       FILENAME = TRIM( DATA_DIR_1x1 ) //
-     &   TRIM( MEGAN_SUBDIR ) // 'MEGANv2.1_AEF_CARENE.geos.1x1' 
+     &   TRIM( MEGAN_SUBDIR ) // 'MEGANv2.1_AEF_CARENE.'//
+     &     MTYPE//'.1x1' 
 
       ! Echo info
       WRITE( 6, 100 ) TRIM( FILENAME )
@@ -2519,7 +2536,7 @@
 
       ! 1x1 file name
       FILENAME = TRIM( DATA_DIR_1x1 ) //
-     &   TRIM( MEGAN_SUBDIR ) // 'MEGANv2.1_AEF_OCIMENE.geos.1x1' 
+     &   TRIM( MEGAN_SUBDIR ) // 'MEGANv2.1_AEF_OCIMENE.'//MTYPE//'.1x1' 
 
       ! Echo info
       WRITE( 6, 100 ) TRIM( FILENAME )
@@ -3042,6 +3059,7 @@
       REAL*8                  :: OUTGRID(IIPAR,JJPAR)
       CHARACTER(LEN=255)      :: FILENAME
       CHARACTER(LEN=255)      :: LLFILENAME
+      CHARACTER(LEN=4)        :: MTYPE
 
       !=================================================================
       ! READ_PFT begins here!
@@ -3051,12 +3069,18 @@
       LLFILENAME = TRIM( DATA_DIR_1x1) //
      &             'MAP_A2A_Regrid_201203/MAP_A2A_latlon_geos1x1.nc'
 
+#if defined( GISS ) || defined( GCAP ) 
+      MTYPE = 'giss'
+#else
+      MTYPE = 'geos'
+#endif
+
       !------------------------------------------------
       ! Fraction of grid box covered by Broadleaf Trees
       !------------------------------------------------
 
       FILENAME = TRIM( DATA_DIR_1x1 ) //
-     &  TRIM( MEGAN_SUBDIR ) // 'MEGAN_PFT_BT.geos.1x1'
+     &  TRIM( MEGAN_SUBDIR ) // 'MEGAN_PFT_BT.'//MTYPE//'.1x1'
 
       ! Echo info
       WRITE( 6, 300 ) TRIM( FILENAME )
@@ -3079,7 +3103,7 @@
       !------------------------------------------------
 
       FILENAME = TRIM( DATA_DIR_1x1 ) //
-     &  TRIM( MEGAN_SUBDIR ) // 'MEGAN_PFT_NT.geos.1x1'
+     &  TRIM( MEGAN_SUBDIR ) // 'MEGAN_PFT_NT.'//MTYPE//'.1x1'
 
       ! Echo info
       WRITE( 6, 300 ) TRIM( FILENAME )
@@ -3101,7 +3125,7 @@
       !------------------------------------------------
 
       FILENAME = TRIM( DATA_DIR_1x1 ) //
-     &  TRIM( MEGAN_SUBDIR ) // 'MEGAN_PFT_SH.geos.1x1'
+     &  TRIM( MEGAN_SUBDIR ) // 'MEGAN_PFT_SH.'//MTYPE//'.1x1'
 
       ! Echo info
       WRITE( 6, 300 ) TRIM( FILENAME )
@@ -3123,7 +3147,7 @@
       !------------------------------------------------
 
       FILENAME = TRIM( DATA_DIR_1x1 ) //
-     &  TRIM( MEGAN_SUBDIR ) // 'MEGAN_PFT_GR.geos.1x1'
+     &  TRIM( MEGAN_SUBDIR ) // 'MEGAN_PFT_GR.'//MTYPE//'.1x1'
 
       ! Echo info
       WRITE( 6, 300 ) TRIM( FILENAME )
@@ -3145,7 +3169,7 @@
       !------------------------------------------------
 
       FILENAME = TRIM( DATA_DIR_1x1 ) //
-     &  TRIM( MEGAN_SUBDIR ) // 'MEGAN_PFT_CR.geos.1x1'
+     &  TRIM( MEGAN_SUBDIR ) // 'MEGAN_PFT_CR.'//MTYPE//'.1x1'
 
       ! Echo info
       WRITE( 6, 300 ) TRIM( FILENAME )
@@ -3507,7 +3531,10 @@
       PFT_CR = 0d0
 
       ! SOAupdate: Read fractional coverage of PFTs from file (hotp 2/27/10)
+#if !defined( MODELE )
+      ! ltm: Fix later
       CALL READ_PFT
+#endif
 
       ! For global and nested simulations (lzh, bmy, 11/22/11)
       CALL GET_AEF
@@ -3555,7 +3582,7 @@
       GCAP_LEAP = .FALSE.
       BACK_ONE  = 0
 
-#if   defined( GCAP )
+#if   defined( GISS ) || defined( GCAP )
 
       ! Extract year, month, day from NYMD_T15b
       CALL YMD_EXTRACT( NYMD_T15b, THISYEAR, THISMONTH, THISDAY )
@@ -3586,6 +3613,34 @@
 
          ! Call CALDATE to compute the current YYYYMMDD and HHMMSS
          CALL CALDATE( JD_T15, NYMD_T15, NHMS_T15 )
+
+#if defined( GISS ) || defined( GCAP )
+
+         ! If MEGAN calls non-existant met-fields for back-dates, just
+         ! use the mean temperature of that day
+         ! Hardwired to years before Model E fields available; could
+         ! make more robust.
+         IF ( FLOOR( NYMD_T15 / 10000. ) .EQ. 1990 ) THEN
+            WRITE(6,*) 'Temp fix for MEGAN and non-existant met'
+            WRITE(6,*) NYMD_T15, 'does not exist'
+            CALL CALDATE( JD_T15b, NYMD_T15, NHMS_T15 )
+         ENDIF
+         IF ( FLOOR( NYMD_T15 / 10000. ) .EQ. 2201 ) THEN
+            WRITE(6,*) 'Temp fix for MEGAN and non-existant met'
+            WRITE(6,*) NYMD_T15, 'does not exist'
+            CALL CALDATE( JD_T15b, NYMD_T15, NHMS_T15 )
+         ENDIF
+         IF ( FLOOR( NYMD_T15 / 10000. ) .EQ. 2301 ) THEN
+            WRITE(6,*) 'Temp fix for MEGAN and non-existant met'
+            WRITE(6,*) NYMD_T15, 'does not exist'
+            CALL CALDATE( JD_T15b, NYMD_T15, NHMS_T15 )
+         ENDIF
+         IF ( FLOOR( NYMD_T15 / 10000. ) .EQ. 2101 ) THEN
+            WRITE(6,*) 'Temp fix for MEGAN and non-existant met'
+            WRITE(6,*) NYMD_T15, 'does not exist'
+            CALL CALDATE( JD_T15b, NYMD_T15, NHMS_T15 )
+         ENDIF
+#endif
 
          ! Unzip A-3 files for archving (if necessary)
          IF ( Input_Opt%LUNZIP ) THEN

@@ -258,6 +258,7 @@
 !
 ! !USES:
 !
+      !USE DAO_MOD,            ONLY : CALC_TPAUSE
       USE ERROR_MOD,          ONLY : GEOS_CHEM_STOP
       USE GIGC_State_Met_Mod, ONLY : MetState
 
@@ -286,6 +287,16 @@
       !=================================================================
       ! CHECK_VAR_TROP begins here!
       !=================================================================
+
+!#if defined( GISS )
+!      ! Calculate tropopause using thermal definition
+!      PRINT*,'Calculating Tropopause Pressure'
+!      DO J = 1, JJPAR
+!      DO I = 1, IIPAR
+!         CALL CALC_TPAUSE( I, J, State_Met )
+!      ENDDO
+!      ENDDO
+!#endif
 
       ! set LMIN and LMAX to current min and max tropopause
       DO J = 1, JJPAR
@@ -718,6 +729,16 @@
          ! Dynamic tropopause
          !--------------------------
 
+#if defined( GISS ) || defined( GCAP )
+
+         !IF ( ITS_TIME_FOR_A6() ) THEN     
+
+         !ENDIF
+
+         L_TP = State_Met%TROPL(I,J)
+
+#else
+
          ! Start at the surface level
          L = 1
 
@@ -751,6 +772,8 @@
             ENDIF
 
          ENDDO
+
+#endif
 
       ELSE
 
@@ -818,11 +841,15 @@
       !=================================================================
       IF ( LVARTROP ) THEN
 
+#if defined( GISS ) || defined( GCAP )
+         IS_TROP = ( L < State_Met%TROPL(I,J) ) ! Treat tropopause level as stratosphere
+#else
          ! Get bottom pressure edge
          PRESS_BEDGE = GET_PEDGE(I,J,L)
 
          ! Check against actual tropopause pressure
          IS_TROP     = ( PRESS_BEDGE > State_Met%TROPP(I,J) )
+#endif
 
       ELSE
          
@@ -1212,6 +1239,63 @@
          ENDDO
 !$OMP END PARALLEL DO
 
+      ENDIF
+
+#elif defined( GISS ) || defined( GCAP )
+
+      ! Scalars
+      INTEGER :: I, J, L
+
+      ! Arrays
+      REAL*8  :: H(IIPAR,JJPAR,LLPAR)
+
+      !=================================================================
+      ! %%%%% GISS Model E
+      ! We already have calculated tropopause level and pressure in 
+      ! dao_mod.F. Archive those, and calculate tropopause height.
+      !=================================================================
+
+      ! Find height of the midpoint of the first level
+      ! H (in m) is the height of the midpoint of layer L (hyl, 03/28/99)
+      DO J = 1, JJPAR
+      DO I = 1, IIPAR
+         H(I,J,1) = State_Met%BXHEIGHT(I,J,1) / 2.d0
+      ENDDO
+      ENDDO
+
+      ! Add to H 1/2 of the sum of the two adjacent boxheights
+      DO L = 1, LLPAR-1
+      DO J = 1, JJPAR
+      DO I = 1, IIPAR
+         H(I,J,L+1) = H(I,J,L) + 
+     &               ( State_Met%BXHEIGHT(I,J,L) + 
+     &                 State_Met%BXHEIGHT(I,J,L+1) ) / 2.d0
+      ENDDO
+      ENDDO
+      ENDDO
+
+      !=================================================================
+      ! ND55: Tropopause level, height [ km ], and pressure [ mb ]
+      !=================================================================
+      IF ( ND55 > 0 ) THEN
+         DO J = 1, JJPAR
+         DO I = 1, IIPAR
+
+            ! Archive level at which tropopause occurs
+            AD55(I,J,1) = AD55(I,J,1) + State_Met%TROPL(I,J)
+
+            ! Archive tropopause height [km]
+            AD55(I,J,2) = AD55(I,J,2) + 
+     &                            H(I,J,State_Met%TROPL(I,J)) / 1.0d3 ! m --> km
+
+            ! We have to estimate the tropopause pressure from the 
+            ! tropopause level.  Archive the pressure at the midpoint
+            ! of the level in which the tropopause occurs.  NOTE: this may
+            ! result in lower minimum tropopause pressure than reality.
+            AD55(I,J,3) = AD55(I,J,3) + State_Met%TROPP(I,J)
+
+         ENDDO
+         ENDDO
       ENDIF
 
 #else

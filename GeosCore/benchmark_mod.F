@@ -1,5 +1,5 @@
 !------------------------------------------------------------------------------
-!                  GEOS-Chem Global Chemical Transport Model                  !
+!                  GEOS-Chem Global Chemical Transport Model                 !
 !------------------------------------------------------------------------------
 !BOP
 !
@@ -40,7 +40,7 @@
       CONTAINS
 !EOC
 !------------------------------------------------------------------------------
-!                  GEOS-Chem Global Chemical Transport Model                  !
+!                  GEOS-Chem Global Chemical Transport Model                 !
 !------------------------------------------------------------------------------
 !BOP
 !
@@ -61,6 +61,7 @@
       USE BPCH2_MOD,          ONLY : OPEN_BPCH2_FOR_WRITE
       USE BPCH2_MOD,          ONLY : GET_HALFPOLAR
       USE BPCH2_MOD,          ONLY : GET_MODELNAME
+      USE BPCH2_MOD,          ONLY : GET_CENTER180
       USE CMN_SIZE_MOD
       USE FILE_MOD,           ONLY : IOERROR
       USE GIGC_Input_Opt_Mod, ONLY : OptInput
@@ -106,7 +107,7 @@
       INTEGER             :: IU_FILE
       INTEGER             :: N,        NYMD,     NHMS
       INTEGER, PARAMETER  :: IFIRST=1, JFIRST=1, LFIRST=1
-      INTEGER, PARAMETER  :: CENTER180=1
+      INTEGER             :: CENTER180
       INTEGER             :: HALFPOLAR
       REAL*4              :: ARRAY(IIPAR,JJPAR,LLPAR)
       REAL*4              :: LONRES, LATRES
@@ -135,6 +136,7 @@
       ! Define variables for binary punch file
       MODELNAME = GET_MODELNAME()
       HALFPOLAR = GET_HALFPOLAR()
+      CENTER180 = GET_CENTER180()
       CATEGORY  = 'TCMASS-$'
       UNIT      = 'kg'
       RESERVED  = ''      

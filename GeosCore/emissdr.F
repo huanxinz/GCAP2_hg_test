@@ -334,6 +334,9 @@
      &                              PFACTOR(I,J),   GEMISNOX2(I,J),
      &                              DEP_FERT,       FERTDIAG, 
      &                              CLIM(I,J,:),    LAND2(I,J,:),
+#if defined( ICECAP )
+     &                              State_Met%LGM_ICE(I,J),
+#endif
      &                              RC,             
      &                              State_Met%SUNCOSmid(I,J),
      &				    State_Met%U10M(I,J),

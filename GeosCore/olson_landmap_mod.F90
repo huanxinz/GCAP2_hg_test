@@ -565,7 +565,7 @@ CONTAINS
 !\\
 ! !INTERFACE:
 !
-  SUBROUTINE Init_Olson_LandMap( am_I_Root, DATA_DIR_1x1 )
+  SUBROUTINE Init_Olson_LandMap( am_I_Root, DATA_DIR_1x1, State_Met )
 !
 ! !USES:
 !
@@ -573,15 +573,23 @@ CONTAINS
     USE m_netcdf_io_read
     USE m_netcdf_io_readattr
     USE m_netcdf_io_close
-    
+
+    USE REGRID_A2A_MOD
+    USE DIRECTORY_MOD,      ONLY : DATA_DIR_1x1
+    USE TIME_MOD,           ONLY : GET_YEAR
+    USE GIGC_State_Met_Mod, ONLY : MetState
+
     IMPLICIT NONE
-    
 #   include "netcdf.inc"
 !
 ! !INPUT PARAMETERS:
 !
     LOGICAL,            INTENT(IN) :: am_I_Root
     CHARACTER(LEN=255), INTENT(IN) :: DATA_DIR_1x1
+!
+! !INPUT/OUTPUT PARAMETERS:
+!
+    TYPE(MetState),  INTENT(INOUT) :: State_Met    ! Meteorology State object
 !
 ! !REMARKS:
 !  Assumes that you have:
@@ -622,7 +630,12 @@ CONTAINS
     ! Arrays for netCDF start and count values
     INTEGER            :: st1d(1), ct1d(1)   ! For 1D arrays    
     INTEGER            :: st3d(3), ct3d(3)   ! For 3D arrays 
-     
+#if defined( ICECAP )
+    REAL*8             :: ICE(720,360)
+    REAL*8, POINTER    :: LGM_ICE(:,:)
+    LGM_ICE => State_Met%LGM_ICE
+#endif
+
     !======================================================================
     ! Initialize variables
     !======================================================================
@@ -783,6 +796,32 @@ CONTAINS
 120 FORMAT( '%%  in directory : ',         a, / , '%%'     )
 130 FORMAT( '%% Successfully read ',       a, ' [', a, ']' )
 140 FORMAT( '%% Successfully closed file!'                 )
+
+#if defined( ICECAP )
+    ! If Last Glacial Maximum then get land ice mask and regrid to resolution
+    IF ( GET_YEAR() .ge. 2200 .and. GET_YEAR() .le. 2399 ) THEN
+       
+       ! Open file for read
+       CALL NcOp_Rd( fId, TRIM(nc_dir) // 'lgm_ice_mask.nc' )
+       
+       ! Read in data
+       CALL NcRd( ice, fId, 'ice', (/ 1, 1 /), (/ 720, 360 /) )
+
+       ! Regrid from 0.5 x 0.5 to actual resolution
+       CALL DO_REGRID_A2A( TRIM(DATA_DIR_1x1) // &
+            'MAP_A2A_Regrid_201203/MAP_A2A_latlon_generic05x05.nc', 720, 360, &
+            ICE,  LGM_ICE, IS_MASS=0, netCDF=.TRUE. )
+       
+       ! Close file
+       CALL NcCl( fId )
+
+       WRITE(6,*) 'LGM LAND ICE MAP'
+       DO J=46,1,-1
+          WRITE(6,'(72F4.1)') LGM_ICE(1:72,J)
+       ENDDO
+       
+    ENDIF
+#endif
 
   END SUBROUTINE Init_Olson_LandMap
 !EOC

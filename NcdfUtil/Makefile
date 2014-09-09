@@ -155,7 +155,7 @@ check: ncdfcheck
 test: ncdfcheck
 
 clean:
-	rm -f *.a *.mod *.o *.nc *.x 
+	rm -f *.i *.i90 *.a *.mod *.o *.nc *.x 
 
 print:
 	@echo $(LINK)

@@ -5402,6 +5402,7 @@
       ! For fields from Input_Opt
       INTEGER         :: N_TRACERS
       LOGICAL         :: LCOOKE
+      LOGICAL         :: LANTHRO
       LOGICAL         :: LPRT
       LOGICAL         :: LSOA
       LOGICAL         :: LRCP
@@ -5425,6 +5426,7 @@
       ! Copy values from Input_Opt
       N_TRACERS = Input_Opt%N_TRACERS
       LCOOKE    = Input_Opt%LCOOKE
+      LANTHRO    = Input_Opt%LANTHRO
       LPRT      = Input_Opt%LPRT
       LSOA      = Input_Opt%LSOA
       LRCP      = Input_Opt%LRCP
@@ -5469,7 +5471,7 @@
         
          ! Read annual mean biomass emissions if necessary
          IF ( USE_BOND_BIOBURN ) THEN
-            CALL BIOMASS_CARB_TBOND( Input_Opt )
+            CALL BIOMASS_CARB_TBOND( Input_Opt, State_Met )
             IF ( LPRT ) CALL DEBUG_MSG( '### EMISSCARB: a B_CRB_TBOND' )
          ENDIF
 
@@ -5487,7 +5489,7 @@
       !------------------------------
       ! Read monthly-mean ANTHRO data
       !------------------------------
-      IF ( ITS_A_NEW_MONTH() ) THEN
+      IF ( LANTHRO .and. ITS_A_NEW_MONTH() ) THEN
       
          ! Current month
          MONTH = GET_MONTH()
@@ -6431,13 +6433,14 @@ ccc
       USE BPCH2_MOD,          ONLY : GET_NAME_EXT_2D,  GET_RES_EXT
       USE BPCH2_MOD,          ONLY : GET_TAU0,         READ_BPCH2
       USE CMN_SIZE_MOD
-      USE DIRECTORY_MOD,      ONLY : DATA_DIR
+      USE DIRECTORY_MOD,      ONLY : DATA_DIR, DATA_DIR_1x1
       USE GIGC_Input_Opt_Mod, ONLY : OptInput
       USE GIGC_State_Met_Mod, ONLY : MetState
       USE MEGAN_MOD,          ONLY : GET_EMMONOT_MEGAN
       ! Speciated MEGAN monoterpenes (hotp 3/10/10)
       USE MEGAN_MOD,          ONLY : GET_EMTERP_MEGAN
       USE MEGANUT_MOD,        ONLY : XLTMMP
+      USE REGRID_A2A_MOD,     ONLY : DO_REGRID_A2A
       USE TIME_MOD,           ONLY : GET_MONTH,        GET_TS_CHEM
       USE TIME_MOD,           ONLY : GET_TS_EMIS,      ITS_A_NEW_MONTH
       USE TRANSFER_MOD,       ONLY : TRANSFER_2D
@@ -6499,6 +6502,11 @@ ccc
       REAL*8                      :: TMMP, EMMO, VALUE
       REAL*8                      :: XTAU, STEPS_PER_MON
       CHARACTER(LEN=255)          :: FILENAME
+
+      REAL*8, POINTER             :: INGRID (:,:) => NULL()
+      REAL*4                      :: GENERIC_2x25(144,91)
+      REAL*8, TARGET              :: GENERIC_8_2x25(144,91)
+      CHARACTER(LEN=255)          :: LLFILENAME
 
       ! Cosine SZA & PAR (for calculation of monoterpenes) (mpb,2009)
       REAL*8                      :: SC, PDF, PDR
@@ -6574,14 +6582,45 @@ ccc
             ! Get TAU0 value to index the punch file
             XTAU  = GET_TAU0( THISMONTH, 1, 1990 )
 
+#if defined( MODELE )
+
+            FILENAME = TRIM( DATA_DIR_1x1 ) // 
+     &           'carbon_200411/NVOC.geos.2x25'
+
+            ! Echo info
+            WRITE( 6, 100 ) TRIM( FILENAME )
+ 100        FORMAT( '     - BIOGENIC_OC: Reading ', a )
+
+            ! Read NVOC emission in kg/month
+            CALL READ_BPCH2( FILENAME, 'NVOCSRCE', 35, 
+     &                       XTAU,      144,       91,     
+     &                       1,         GENERIC_2x25,     QUIET=.TRUE. ) 
+
+            ! Cast from REAL*4 to REAL*8 
+            GENERIC_8_2x25 = GENERIC_2x25
+            
+            ! File with lat/lon edges for regridding
+            LLFILENAME = TRIM( DATA_DIR_1x1) //
+     &           'MAP_A2A_Regrid_201203/MAP_A2A_latlon_geos2x25.nc'
+            
+            ! Regrid to current model resolution
+            INGRID => GENERIC_8_2x25
+            CALL DO_REGRID_A2A( LLFILENAME,     144,        91,
+     &           INGRID, GEIA_ORVC, IS_MASS=1, netCDF=.TRUE. )
+            
+            ! Free pointer
+            NULLIFY( INGRID )
+
+#else
+
             ! Filename for carbon aerosol from fossil fuel use
             FILENAME = TRIM( DATA_DIR )      //
      &                 'carbon_200411/NVOC.' // GET_NAME_EXT_2D() //
      &                 '.'                   // GET_RES_EXT()
 
             ! Echo info
-            WRITE( 6, 100 ) TRIM( FILENAME )
- 100        FORMAT( '     - BIOGENIC_OC: Reading ', a )
+            WRITE( 6, 101 ) TRIM( FILENAME )
+ 101        FORMAT( '     - BIOGENIC_OC: Reading ', a )
 
             ! Read NVOC emission in kg/month
             CALL READ_BPCH2( FILENAME, 'NVOCSRCE', 35, 
@@ -6590,6 +6629,8 @@ ccc
 
             ! Cast to REAL*8 and resize
             CALL TRANSFER_2D( ARRAY(:,:,1), GEIA_ORVC )
+
+#endif
 
             ! from kgC/month to kgC/timestep
             GEIA_ORVC(:,:) = GEIA_ORVC(:,:) / STEPS_PER_MON
@@ -6964,21 +7005,8 @@ ccc
             XTAU          = GET_TAU0( THISMONTH, 1, 2000 )   
       
             ! Filename for carbon aerosol from fossil fuel use
-            FILENAME = TRIM( DATA_DIR )                         // 
-     &                 'carbon_200909/BCOC_TBond_fossil.2000.'  // 
-     &                 GET_NAME_EXT_2D() // '.' // GET_RES_EXT()
-
-            ! Echo info
-            WRITE( 6, 100 ) TRIM( FILENAME )
- 100        FORMAT( '     - ANTHRO_CARB_TBOND: Reading ', a )     
-
-            ! Read BLCK emission
-            CALL READ_BPCH2( FILENAME, 'ANTHSRCE', 34, 
-     &                       XTAU,      IIPAR,     JJPAR,     
-     &                       1,         ARRAY,     QUIET=.TRUE. ) 
-
-            ! Cast to REAL*8 and resize
-            CALL TRANSFER_2D( ARRAY(:,:,1), FD2D )
+            FILENAME = TRIM( DATA_DIR_1x1 )                     // 
+     &               'carbon_200909/BCOC_TBond_fossil.2000.generic.1x1'
       
          ELSE
 
@@ -6992,27 +7020,30 @@ ccc
      &                 '.'               // GET_NAME_EXT_2D() // 
      &                 '.1x1'
 
-            ! Echo info
-            WRITE( 6, 100 ) TRIM( FILENAME )
-
-            ! Read BLCK emission
-            CALL READ_BPCH2( FILENAME, 'ANTHSRCE',   34, 
-     &                       XTAU,      I1x1,        J1x1-1,     
-     &                       1,         GENERIC_1x1, QUIET=.TRUE. ) 
-
-            ! Cast from REAL*4 to REAL*8
-            GEN8_1x1 = GENERIC_1x1
-
-            ! Regrid to current model resolution [kg/yr]
-            INGRID  => GEN8_1x1(:,:)
-            CALL DO_REGRID_A2A( LLFILENAME, I1x1, J1x1-1, 
-     &                          INGRID,     FD2D, IS_MASS=1,
-     &                          netCDF=.TRUE.                )
-
-            ! Free pointer
-            NULLIFY( INGRID )
-
          ENDIF ! LHIST
+
+         ! Echo info
+         WRITE( 6, 102 ) TRIM( FILENAME )
+ 102     FORMAT( '     - ANTHRO_CARB_TBOND: Reading ', a )     
+
+         ! Read BLCK emission
+         CALL READ_BPCH2( FILENAME, 'ANTHSRCE',   34, 
+     &                    XTAU,      I1x1,        J1x1-1,     
+     &                    1,         GENERIC_1x1, QUIET=.TRUE. ) 
+
+
+         ! Cast from REAL*4 to REAL*8
+         GEN8_1x1 = GENERIC_1x1
+
+         ! Regrid to current model resolution [kg/yr]
+         INGRID  => GEN8_1x1(:,:)
+         CALL DO_REGRID_A2A( LLFILENAME, I1x1, J1x1-1, 
+     &                       INGRID,     FD2D, IS_MASS=1,
+     &                       netCDF=.TRUE.                )
+
+         ! Free pointer
+         NULLIFY( INGRID )
+
 !eml]
 
 
@@ -7045,35 +7076,23 @@ ccc
          ! in [kg C/month].  Then Convert to [kg C/timestep] and store in 
          ! ANTH_ORGC.
          !=================================================================
-         IF( .not. LHIST ) THEN
 
-            CALL READ_BPCH2( FILENAME, 'ANTHSRCE', 35, 
-     &                       XTAU,      IIPAR,     JJPAR,     
-     &                       1,         ARRAY,     QUIET=.TRUE. ) 
+         ! Read ORGC emission (XTAU and FILENAME as for BLKC)
+         CALL READ_BPCH2( FILENAME, 'ANTHSRCE',   35, 
+     &                    XTAU,      I1x1,        J1x1-1,     
+     &                    1,         GENERIC_1x1, QUIET=.TRUE. ) 
 
-            ! Cast to REAL*8 and resize
-            CALL TRANSFER_2D( ARRAY(:,:,1), FD2D )
+         ! Cast from REAL*4 to REAL*8
+         GEN8_1x1 = GENERIC_1x1
 
-         ELSE
+         ! Regrid to current model resolution [kg/yr]
+         INGRID  => GEN8_1x1(:,:)
+         CALL DO_REGRID_A2A( LLFILENAME, I1x1, J1x1-1, 
+     &                       INGRID,     FD2D, IS_MASS=1,
+     &                       netCDF=.TRUE.                )
 
-            ! Read historical emissions of BC
-            CALL READ_BPCH2( FILENAME, 'ANTHSRCE',   35, 
-     &                       XTAU,      I1x1,        J1x1-1,     
-     &                       1,         GENERIC_1x1, QUIET=.TRUE. ) 
-
-            ! Cast from REAL*4 to REAL*8
-            GEN8_1x1 = GENERIC_1x1
-
-            ! Regrid to current model resolution [kg/yr]
-            INGRID  => GEN8_1x1(:,:)
-            CALL DO_REGRID_A2A( LLFILENAME, I1x1, J1x1-1, 
-     &                          INGRID,     FD2D, IS_MASS=1,
-     &                          netCDF=.TRUE.                )
-
-            ! Free pointer
-            NULLIFY( INGRID )
-
-         ENDIF ! LHIST
+         ! Free pointer
+         NULLIFY( INGRID )
 
 !$OMP PARALLEL DO
 !$OMP+DEFAULT( SHARED )
@@ -7113,60 +7132,50 @@ ccc
       IF( LBIOFUEL ) THEN
 
          IF( .not. LHIST ) THEN
-            ! clh: add this in (otherwise read fails when LANTHRO is F)
+
             ! Get TAU0 value to index the punch file
-            XTAU          = GET_TAU0( THISMONTH, 1, 2000 )
-
-
-            ! Filename
-            FILENAME = TRIM( DATA_DIR )                         // 
-     &                 'carbon_200909/BCOC_TBond_biofuel.2000.' // 
-     &                 GET_NAME_EXT_2D() // '.' // GET_RES_EXT()
-
-            ! Echo info
-            WRITE( 6, 100 ) TRIM( FILENAME )
-
-            ! Read data
-            CALL READ_BPCH2( FILENAME, 'BIOFSRCE', 34, 
-     &                       XTAU,      IIPAR,     JJPAR,
-     &                       1,         ARRAY,     QUIET=.TRUE. ) 
-
-            ! Cast to REAL*8 and resize
-            CALL TRANSFER_2D( ARRAY(:,:,1), FD2D )
-
+            XTAU          = GET_TAU0( THISMONTH, 1, 2000 )   
+      
+            ! Filename for carbon aerosol from fossil fuel use
+            FILENAME = TRIM( DATA_DIR_1x1 )                     // 
+     &               'carbon_200909/BCOC_TBond_biofuel.2000.generic.1x1'
+      
          ELSE
-            ! clh: add this in (otherwise read fails when LANTHRO is F)
+
             XTAU = GET_TAU0( THISMONTH, 1, GET_HISTYR() )
             WRITE( CHISTYR, '(I4)' ) GET_HISTYR()
 
             ! Read historical emissions of BC
-            FILENAME = TRIM( DATA_DIR_1x1 )                 // 
-     &                 'historical_emissions_201203/BCOC/'  //
-     &                 'BCOC_biofuel.' // CHISTYR           // 
-     &                 '.'             // GET_NAME_EXT_2D() // 
+            FILENAME = TRIM( DATA_DIR_1x1 )                   // 
+     &                 'historical_emissions_201203/BCOC/'    //
+     &                 'BCOC_biofuel.'  // CHISTYR           // 
+     &                 '.'              // GET_NAME_EXT_2D() // 
      &                 '.1x1'
 
-            ! Echo info
-            WRITE( 6, 100 ) TRIM( FILENAME )
+         ENDIF ! LHIST
 
-            ! Read data
-            CALL READ_BPCH2( FILENAME, 'BIOFSRCE',   34, 
-     &                       XTAU,      I1x1,        J1x1-1,
-     &                       1,         GENERIC_1x1, QUIET=.TRUE. ) 
+         ! Echo info
+         WRITE( 6, 103 ) TRIM( FILENAME )
+ 103     FORMAT( '     - ANTHRO_CARB_TBOND: Reading ', a )     
 
-            ! Cast from REAL*4 to REAL*8
-            GEN8_1x1 = GENERIC_1x1
+         ! Read BLCK emission
+         CALL READ_BPCH2( FILENAME, 'BIOFSRCE',   34, 
+     &                    XTAU,      I1x1,        J1x1-1,     
+     &                    1,         GENERIC_1x1, QUIET=.TRUE. ) 
 
-            ! Regrid to current model resolution [kg/yr]
-            INGRID  => GEN8_1x1(:,:)
-            CALL DO_REGRID_A2A( LLFILENAME, I1x1, J1x1-1, 
-     &                          INGRID,     FD2D, IS_MASS=1,
-     &                          netCDF=.TRUE.                )
 
-            ! Free pointer
-            NULLIFY( INGRID )
+         ! Cast from REAL*4 to REAL*8
+         GEN8_1x1 = GENERIC_1x1
 
-         ENDIF
+         ! Regrid to current model resolution [kg/yr]
+         INGRID  => GEN8_1x1(:,:)
+         CALL DO_REGRID_A2A( LLFILENAME, I1x1, J1x1-1, 
+     &                       INGRID,     FD2D, IS_MASS=1,
+     &                       netCDF=.TRUE.                )
+
+         ! Free pointer
+         NULLIFY( INGRID )
+
 !eml]
 
 !$OMP PARALLEL DO
@@ -7198,33 +7207,23 @@ ccc
          ! Read ORGANIC CARBON from biofuel combustion as tracer #35 in
          ! [kg C/year].  Convert to [kg C/timestep] and store in BIOF_BLKC.
          !=================================================================
-         IF( .not. LHIST ) THEN
-            CALL READ_BPCH2( FILENAME, 'BIOFSRCE', 35, 
-     &                       XTAU,      IIPAR,     JJPAR,     
-     &                       1,         ARRAY,     QUIET=.TRUE. )
 
-            ! Cast to REAL*8 and resize
-            CALL TRANSFER_2D( ARRAY(:,:,1), FD2D )
+         ! Read ORGC emission (XTAU and FILENAME as for BLKC)
+         CALL READ_BPCH2( FILENAME, 'BIOFSRCE',   35, 
+     &                    XTAU,      I1x1,        J1x1-1,     
+     &                    1,         GENERIC_1x1, QUIET=.TRUE. ) 
 
-         ELSE
+         ! Cast from REAL*4 to REAL*8
+         GEN8_1x1 = GENERIC_1x1
 
-            CALL READ_BPCH2( FILENAME, 'BIOFSRCE',   35, 
-     &                       XTAU,      I1x1,        J1x1-1,     
-     &                       1,         GENERIC_1x1, QUIET=.TRUE. )
+         ! Regrid to current model resolution [kg/yr]
+         INGRID  => GEN8_1x1(:,:)
+         CALL DO_REGRID_A2A( LLFILENAME, I1x1, J1x1-1, 
+     &                       INGRID,     FD2D, IS_MASS=1,
+     &                       netCDF=.TRUE.                )
 
-            ! Cast from REAL*4 to REAL*8
-            GEN8_1x1 = GENERIC_1x1
-
-            ! Regrid to current model resolution [kg/yr]
-            INGRID  => GEN8_1x1(:,:)
-            CALL DO_REGRID_A2A( LLFILENAME, I1x1, J1x1-1, 
-     &                          INGRID,     FD2D, IS_MASS=1,
-     &                          netCDF=.TRUE.                )
-
-            ! Free pointer
-            NULLIFY( INGRID )
-
-         ENDIF ! LHIST
+         ! Free pointer
+         NULLIFY( INGRID )
 
 !$OMP PARALLEL DO
 !$OMP+DEFAULT( SHARED )
@@ -7331,13 +7330,17 @@ ccc
 
       ! For fields from Input_Opt
       LOGICAL                       :: LFUTURE
+      LOGICAL                       :: LANTHRO
+      LOGICAL                       :: LBIOFUEL
 
       !=================================================================
       ! ANTHRO_CARB_COOKE begins here!
       !=================================================================
 
       ! Copy values from Input_Opt
-      LFUTURE = Input_Opt%LFUTURE
+      LFUTURE  = Input_Opt%LFUTURE
+      LANTHRO  = Input_Opt%LANTHRO
+      LBIOFUEL = Input_Opt%LBIOFUEL
 
       ! Return if we are running on a nested grid (e.g. China) which
       ! does not cover the North America region (rjp, bmy, 12/1/04)
@@ -7348,6 +7351,8 @@ ccc
       
       ! Get TAU0 value to index the punch file
       XTAU = GET_TAU0( THISMONTH, 1, 1998 )
+
+      IF ( LANTHRO ) THEN
 
       !=================================================================
       ! Read BLACK CARBON (aka ELEMENTAL CARBON) emission from 
@@ -7427,6 +7432,9 @@ ccc
          ENDIF
       ENDDO
       ENDDO
+
+      ENDIF ! LANTHRO
+      IF ( LBIOFUEL ) THEN
 
       !=================================================================
       ! Read BLACK CARBON (aka ELEMENTAL CARBON) emission from biofuel 
@@ -7512,6 +7520,9 @@ ccc
       ENDDO
       ENDDO
 
+      ENDIF ! LBIOFUEL
+
+      ! Return to calling program
       END SUBROUTINE ANTHRO_CARB_COOKE
 !EOC
 !------------------------------------------------------------------------------
@@ -7639,7 +7650,7 @@ ccc
 !\\
 ! !INTERFACE:
 !
-      SUBROUTINE BIOMASS_CARB_TBOND( Input_Opt )
+      SUBROUTINE BIOMASS_CARB_TBOND( Input_Opt, State_Met )
 !
 ! !USES:
 !
@@ -7650,12 +7661,14 @@ ccc
       USE FUTURE_EMISSIONS_MOD, ONLY : GET_FUTURE_SCALE_BCbb
       USE FUTURE_EMISSIONS_MOD, ONLY : GET_FUTURE_SCALE_OCbb
       USE GIGC_Input_Opt_Mod,   ONLY : OptInput
-      USE TIME_MOD,             ONLY : GET_TS_EMIS
+      USE GIGC_State_Met_Mod,   ONLY : MetState
+      USE TIME_MOD,             ONLY : GET_TS_EMIS,     GET_YEAR
       USE TRANSFER_MOD,         ONLY : TRANSFER_2D
 !
 ! !INPUT PARAMETERS:
 !
       TYPE(OptInput), INTENT(IN)    :: Input_Opt   ! Input Options object
+      TYPE(MetState), INTENT(IN)    :: State_Met   ! Input Options object
 !
 ! !REMARKS:
 !  Emissions data comes from the Bond et al [2004] inventory and has units
@@ -7684,11 +7697,15 @@ ccc
 ! !LOCAL VARIABLES:
 !
       ! Local variables
-      INTEGER                       :: I, J
+      INTEGER                       :: I, J, THISYEAR
       REAL*4                        :: ARRAY(IIPAR,JJPAR,1)
       REAL*8                        :: XTAU, STEPS_PER_YR, FUT_SCL
       REAL*8                        :: FD2D(IIPAR,JJPAR)
       CHARACTER(LEN=255)            :: FILENAME
+
+#if defined( GISS )
+      REAL*8, POINTER               :: SNICE(:,:)
+#endif
 
       ! For fields from Input_Opt
       LOGICAL                       :: LFUTURE
@@ -7699,6 +7716,11 @@ ccc
 
       ! Copy values from Input_Opt
       LFUTURE = Input_Opt%LFUTURE
+
+#if defined( GISS )
+      ! Assign pointers
+      SNICE => State_Met%SNICE
+#endif
 
       ! Number of emission timesteps per year
       STEPS_PER_YR = ( ( 1440 * 365 ) / GET_TS_EMIS() )
@@ -7783,6 +7805,42 @@ ccc
       ENDDO
       ENDDO
 !$OMP END PARALLEL DO
+
+#if defined( GISS )
+!$OMP PARALLEL DO
+!$OMP+DEFAULT( SHARED )
+!$OMP+PRIVATE( I, J )
+      DO J = 1, JJPAR
+      DO I = 1, IIPAR
+            
+#if defined( ICECAP )
+         THISYEAR = GET_YEAR()
+         SELECT CASE ( THISYEAR )
+            CASE( 2100, 2101, 2102, 2103, 2104, 2105, 
+     &           2200, 2201, 2202, 2203, 2204, 2205,
+     &           2300, 2301, 2302, 2303, 2304, 2305  )
+            ! Assume 10% of PD [Crutzen and Zimmerman, 1991] and
+            ! no BB over ice and show
+            BIOB_BLKC(I,J,1) = BIOB_BLKC(I,J,1) * ( 1d0-SNICE(I,J) )/1d1
+            BIOB_BLKC(I,J,2) = BIOB_BLKC(I,J,2) * ( 1d0-SNICE(I,J) )/1d1
+            BIOB_ORGC(I,J,1) = BIOB_ORGC(I,J,1) * ( 1d0-SNICE(I,J) )/1d1
+            BIOB_ORGC(I,J,2) = BIOB_ORGC(I,J,2) * ( 1d0-SNICE(I,J) )/1d1
+         CASE DEFAULT
+            ! No BB over ice and snow
+            BIOB_BLKC(I,J,1) = BIOB_BLKC(I,J,1) * ( 1d0-SNICE(I,J) )
+            BIOB_BLKC(I,J,2) = BIOB_BLKC(I,J,2) * ( 1d0-SNICE(I,J) )
+            BIOB_ORGC(I,J,1) = BIOB_ORGC(I,J,1) * ( 1d0-SNICE(I,J) )
+            BIOB_ORGC(I,J,2) = BIOB_ORGC(I,J,2) * ( 1d0-SNICE(I,J) )
+         END SELECT
+
+         ! Free pointer
+         NULLIFY( SNICE )
+#endif
+
+      ENDDO
+      ENDDO
+!$OMP END PARALLEL DO
+#endif
       
       END SUBROUTINE BIOMASS_CARB_TBOND
 !EOC

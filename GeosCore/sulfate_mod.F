@@ -5980,7 +5980,12 @@
       NSEASON = GET_SEASON()
       DAY     = GET_DAY()
       MONTH   = GET_MONTH()
+#if defined( GISS )
+      ! Set volanic emissions to typical year for now
+      YEAR    = 1995
+#else
       YEAR    = GET_YEAR()
+#endif
 
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 !%%% NOTE: This is for the SEAC4RS volcano emissions.  Leave code commented
@@ -6062,7 +6067,7 @@
 
          ! Also read ship exhaust SO2 if necessary 
          !CALL READ_SHIP_SO2( MONTH )
-         CALL READ_SHIP_SO2( Input_Opt, MONTH )
+         IF ( LANTHRO ) CALL READ_SHIP_SO2( Input_Opt, MONTH )
 #if defined( TOMAS )
          ! Scale anthro SO2 for TOMAS
          ESO2_sh  = ESO2_sh * scaleanthso2
@@ -10353,6 +10358,9 @@
       ! READ_SST begins here!
       !==================================================================
 
+ 100     FORMAT( '     - READ_SST: Reading ', a ) 
+
+#if !defined( GISS )
       IF ( THISYEAR >= 1985 .and. THISYEAR <= 2008 ) THEN 
          
          !------------------------------------
@@ -10370,7 +10378,6 @@
 
          ! Echo output
          WRITE( 6, 100 ) TRIM( FILENAME )  
- 100     FORMAT( '     - READ_SST: Reading ', a ) 
 
          ! TAU value (use this year)
          XTAU = GET_TAU0( THISMONTH, 1, THISYEAR )
@@ -10391,6 +10398,7 @@
      &                       netCDF=.TRUE.                   )
 
       ELSE
+#endif
 
          !-------------------------------
          ! Use climatological SST data 
@@ -10415,7 +10423,9 @@
          ! Cast from REAL*4 to REAL*8 
          CALL TRANSFER_2D( ARRAY(:,:,1), SSTEMP )
 
+#if !defined( GISS )
       ENDIF
+#endif
 
       ! Copy met field to State_Met
       State_Met%SST = SSTEMP
@@ -10505,6 +10515,8 @@
 !
       INTEGER                       :: I, J, THISYEAR
       REAL*4                        :: ARRAY(IIPAR,JJPAR,1)
+      REAL*4                        :: GENERIC_2x25(144,91)
+      REAL*8, TARGET                :: GENERIC_8_2x25(144,91)
       REAL*8                        :: BIOCO(IIPAR,JJPAR)
       REAL*8                        :: XTAU
       CHARACTER(LEN=4  )            :: CYEAR
@@ -10536,13 +10548,43 @@
 ![eml
       IF(.not. LHIST) THEN
 !eml]
+
+ 100     FORMAT( '     - READ_BIOFUEL_SO2: Reading ', a )
+
+#if defined( GISS )
+         
+         FILENAME = TRIM( DATA_DIR_1x1 ) //
+     &        'biofuel_200202/biofuel.geos.2x25'
+         
+         ! Echo info
+         WRITE( 6, 100 ) TRIM( FILENAME )
+
+         ! Get TAU0 value (use generic year 1985)
+         XTAU = GET_TAU0( 1, 1, 1985 )
+
+         ! Read Biofuel burning of CO [kg/yr]
+         CALL READ_BPCH2( FILENAME, 'BIOFSRCE',    4, 
+     &                    XTAU,      144,  91, 1,      
+     &                    GENERIC_2x25, QUIET=.TRUE.  ) 
+
+         LLFILENAME = TRIM( DATA_DIR_1x1) //
+     &        'MAP_A2A_Regrid_201203/MAP_A2A_latlon_geos2x25.nc'
+         
+         GENERIC_8_2x25 = GENERIC_2x25
+         INGRID => GENERIC_8_2x25
+         CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &        INGRID, BIOCO, IS_MASS=1, NetCDF=.TRUE. )
+
+         NULLIFY(INGRID)
+
+#else
+
          FILENAME = TRIM( DATA_DIR )          // 
      &              'biofuel_200202/biofuel.' // GET_NAME_EXT_2D() //
      &              '.'                       // GET_RES_EXT()
 
          ! Echo info
          WRITE( 6, 100 ) TRIM( FILENAME )
- 100     FORMAT( '     - READ_BIOFUEL_SO2: Reading ', a )
 
          ! Get TAU0 value (use generic year 1985)
          XTAU = GET_TAU0( 1, 1, 1985 )
@@ -10554,6 +10596,8 @@
 
          ! Cast from REAL*4 to REAL*8
          CALL TRANSFER_2D( ARRAY(:,:,1), BIOCO )
+
+#endif
 
          !=================================================================
          ! Unit conversion to [kg SO2/s]

@@ -99,7 +99,8 @@
 ! !USES:
 !
       USE BPCH2_MOD,          ONLY : BPCH2,         GET_MODELNAME
-      USE BPCH2_MOD,          ONLY : GET_HALFPOLAR, OPEN_BPCH2_FOR_WRITE
+      USE BPCH2_MOD,          ONLY : GET_HALFPOLAR, GET_CENTER180
+      USE BPCH2_MOD,          ONLY : OPEN_BPCH2_FOR_WRITE
       USE CMN_SIZE_MOD
       USE ERROR_MOD,          ONLY : DEBUG_MSG
       USE FILE_MOD,           ONLY : IOERROR
@@ -174,7 +175,7 @@
       INTEGER              :: IU_RST
       REAL*4               :: LONRES, LATRES
       INTEGER              :: HALFPOLAR
-      INTEGER, PARAMETER   :: CENTER180 = 1
+      INTEGER              :: CENTER180
       
       CHARACTER(LEN=20)    :: MODELNAME
       CHARACTER(LEN=40)    :: CATEGORY
@@ -217,8 +218,10 @@
       MODELNAME = GET_MODELNAME()
 
       ! Call GET_HALFPOLAR to return the proper value
-      ! for either GCAP or GEOS grids (bmy, 6/28/05)
       HALFPOLAR = GET_HALFPOLAR()
+
+      ! Call GET_CENTER180 to return the proper value
+      CENTER180 = GET_CENTER180()
 
       ! Get the nested-grid offsets
       I0 = GET_XOFFSET( GLOBAL=.TRUE. )
@@ -946,7 +949,7 @@
       ! make HALFPOLAR variable (hotp 2/25/09)
       !INTEGER, PARAMETER   :: HALFPOLAR = 1
       INTEGER              :: HALFPOLAR
-      INTEGER, PARAMETER   :: CENTER180 = 1
+      INTEGER              :: CENTER180
 
       INTEGER 		   :: MAX_nitr_max
       INTEGER 		   :: NSOFAR
@@ -990,8 +993,11 @@
       CATEGORY = 'IJ-CHK-$'
       LONRES   = DISIZE
       LATRES   = DJSIZE
+
       ! get value of HALFPOLAR hotp 2/25/09
       HALFPOLAR = GET_HALFPOLAR()
+
+      CENTER180 = GET_CENTER180()
 
       ! Call GET_MODELNAME to return the proper model name for
       ! the given met data being used (bmy, 6/22/00)

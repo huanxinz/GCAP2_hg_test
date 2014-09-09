@@ -1030,6 +1030,8 @@
 ! !USES:
 !
       USE CMN_SIZE_MOD
+      USE TIME_MOD,           ONLY : GET_YEAR
+      USE DIRECTORY_MOD,      ONLY : DATA_DIR_1x1
       USE FILE_MOD,           ONLY : IOERROR
       USE GIGC_ErrCode_Mod
       USE GIGC_Input_Opt_Mod, ONLY : OptInput
@@ -1066,7 +1068,7 @@
 ! 
       ! Scalars
       INTEGER            :: IU_FILE, K,     J
-      INTEGER            :: M,       NTBLS, IOS
+      INTEGER            :: M,       NTBLS, IOS, THISYEAR
       REAL*8             :: TMAX,    TMIN
 
       ! Dimension sizes
@@ -1094,8 +1096,35 @@
       NMONTHS_LINOZ  = Input_Opt%LINOZ_NMONTHS
 
       ! Filename
+#if defined( MODELE )
+
+      THISYEAR = GET_YEAR()      
+      FILENAME = TRIM( DATA_DIR_1x1 ) // 'Linoz_200908/'
+
+      SELECT CASE ( THISYEAR )
+      CASE( 1980:2020 )         ! Present Day
+         FILENAME = TRIM(FILENAME) // 
+     &        'Linoz_Aug2009_LLM_long-lived.dat'
+      CASE( 2100, 2101, 2102, 2103, 2104, 2105 ) ! Pre-Industrial
+         FILENAME = TRIM(FILENAME) //
+     &        'LinozPreI_Aug2009_LLM_long-lived.dat'
+      CASE( 2200, 2201, 2202, 2203, 2204, 2205 ) ! LGM CLIMAP
+         FILENAME = TRIM(FILENAME) // 
+     &        'LinozLGM_Aug2009_LLM_long-lived.dat'
+      CASE( 2300, 2301, 2302, 2303, 2304, 2305 ) ! LGM Webb
+         FILENAME = TRIM(FILENAME) // 
+     &        'LinozLGM_Aug2009_LLM_long-lived.dat'
+      CASE DEFAULT
+         FILENAME = TRIM(FILENAME) //
+     &        'Linoz_Aug2009_LLM_long-lived.dat'
+      END SELECT
+         
+#else
+
       FILENAME       = TRIM( Input_Opt%DATA_DIR_1x1 ) //
      &                 'Linoz_200910/Linoz_March2007.dat'
+
+#endif
 
       ! Echo info
       IF ( am_I_Root ) THEN

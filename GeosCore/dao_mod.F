@@ -583,6 +583,7 @@
       USE GIGC_State_Met_Mod, ONLY : MetState
       USE GRID_MOD,           ONLY : GET_YEDGE
       USE LOGICAL_MOD,        ONLY : LVARTROP
+      USE TIME_MOD,           ONLY : ITS_TIME_FOR_A6
 !
 ! !INPUT PARAMETERS: 
 !
@@ -657,7 +658,7 @@
 !
       INTEGER :: I,        J,        L
       REAL*8  :: D_NTIME0, D_NTIME1, D_NDT
-      REAL*8  :: D_NTDT,   TM,       TC2
+      REAL*8  :: D_NTDT,   TM,       TC2,   TC1
       REAL*8  :: YSOUTH,   YNORTH
 
       !=================================================================
@@ -674,6 +675,9 @@
 #else
       D_NDT    = 21600d0              ! For 6-hr instantaneous fields
 #endif      
+
+      ! Fraction of 6h timestep elapsed at beginning of this dyn timestep
+      TC1 = ( D_NTIME1              - D_NTIME0 ) / D_NDT 
 
       ! Fraction of 6h timestep elapsed at mid point of this dyn timestep
       TM  = ( D_NTIME1 + D_NTDT/2d0 - D_NTIME0 ) / D_NDT
@@ -702,7 +706,7 @@
      &                         State_Met%PS1(I,J) ) * TC2 
 
          ! Test if we are using the variable tropopause
-         IF ( LVARTROP ) THEN
+         IF ( Input_Opt%LVARTROP ) THEN
  
             ! Interpolate TROPP [hPa] to the midpt of the dynamic timestep
             State_Met%TROPP(I,J) = State_Met%TROPP1(I,J) +
@@ -719,6 +723,60 @@
             ENDIF
          ENDIF
       ENDDO
+      ENDDO
+!$OMP END PARALLEL DO
+
+#elif defined( GISS )
+
+      !=================================================================
+      ! Do the interpolation for GISS ModelE met fields 
+      !=================================================================
+
+!$OMP PARALLEL DO
+!$OMP+DEFAULT( SHARED )
+!$OMP+PRIVATE( I, J, YSOUTH, YNORTH )
+      DO J = 1, JJPAR
+         DO I = 1, IIPAR
+
+            ! North & south edges of box
+            YSOUTH = GET_YEDGE( I,   J, 1 )
+            YNORTH = GET_YEDGE( I, J+1, 1 )
+
+            ! Interpolate pressure [hPa] to the start of the dynamic timestep
+            State_Met%PSC1(I,J) = State_Met%PS1(I,J) + 
+     &                 ( State_Met%PS2(I,J) - State_Met%PS1(I,J) ) * TC1
+
+            ! Interpolate pressure [hPa] to the middle of the dynamic timestep
+            State_Met%PSCm(I,J) = State_Met%PS1(I,J) + 
+     &                 ( State_Met%PS2(I,J) - State_Met%PS1(I,J) ) * TM
+
+            ! Interpolate pressure [hPa] to the end of the dynamic timestep
+            State_Met%PSC2(I,J) = State_Met%PS1(I,J) + 
+     &                 ( State_Met%PS2(I,J) - State_Met%PS1(I,J) ) * TC2 
+
+            ! Test if we are using the variable tropopause
+            IF ( LVARTROP ) THEN
+ 
+               ! GISS calculates the tropopause press from
+               ! temperature and box heights for the variable tropopause.
+               ! As temperature is not interpolated for GCAP, 
+               ! we only need to update this every a6 timestep
+               IF ( ITS_TIME_FOR_A6() ) THEN
+                  CALL CALC_TPAUSE( I, J, State_Met )
+               ENDIF
+
+               ! However, we still need to make sure to cap TROPP in the
+               ! polar regions (if the entire box is outside 60S-60N)
+               ! so that we don't do chemistry at an abnormally high
+               ! altitude.  Set TROPP in the polar regions to 200 hPa.
+               ! (jal, phs, bmy, 9/18/07)
+               !IF ( YSOUTH >= 60d0 .or. YNORTH <= -60d0 ) THEN
+               !   State_Met%TROPP(I,J) = MAX( State_Met%TROPP(I,J), 200d0 )
+               !ENDIF
+
+            ENDIF
+
+         ENDDO
       ENDDO
 !$OMP END PARALLEL DO
 
@@ -893,7 +951,297 @@
       END SUBROUTINE INTERP
 !EOC
 !------------------------------------------------------------------------------
-!                  GEOS-Chem Global Chemical Transport Model                  !
+!                  GEOS-Chem Global Chemical Transport Model                 !
+!------------------------------------------------------------------------------
+!BOP
+!
+! !IROUTINE: CALC_TPAUSE
+!
+! !DESCRIPTION: calculates thermal tropopause using the WMO definition,
+!  as calculated in CALC_TROP in Model E for consistency (ltm).
+!\\
+!\\
+! !INTERFACE:
+!
+      SUBROUTINE CALC_TPAUSE( I, J, State_Met )
+!
+! !USES:
+      USE PRESSURE_MOD, ONLY : GET_PCENTER
+      USE CMN_SIZE_MOD
+      USE GIGC_State_Met_Mod, ONLY : MetState
+
+      IMPLICIT NONE
+
+! !INPUT PARAMETERS: 
+!
+      INTEGER, INTENT(IN)           :: I         ! Longitude index
+      INTEGER, INTENT(IN)           :: J         ! Latitude  index
+      TYPE(MetState), INTENT(INOUT) :: State_Met ! Meteorology State object
+!
+! !RETURN VALUE:
+!
+! !REMARKS:
+! 
+! 
+! !REVISION HISTORY: 
+!EOP
+!------------------------------------------------------------------------------
+!BOC
+      
+      ! Parameters
+      real*8,parameter  :: srat = 1.401d0      
+      real*8,parameter  :: zkappa = (srat - 1.)/srat ! =.2862.... ! kapa
+      real*8,parameter  :: zzkap = 1d0/zkappa ! bykapa
+      real*8,parameter  :: mair = 28.9655d0
+      real*8,parameter  :: gasc = 8.314510d0
+      real*8,parameter  :: rgas = 1d3 * gasc / mair
+      real*8,parameter  :: grav = 9.80665d0
+
+      ! Local Variables
+      REAL*8,DIMENSION(LLPAR) :: TL, PK, PRESSMID
+      REAL*8  :: PTROP
+      INTEGER :: LTROP
+      integer :: klev 
+      INTEGER :: J_0, J_1, J_0S, J_1S, J_0STG, J_1STG, L, IERR,II
+      LOGICAL :: HAVE_SOUTH_POLE, HAVE_NORTH_POLE
+
+!     Use values for GISS ModelE
+      J_0 = 1                   ! J_STRT
+      J_1 = JJPAR               ! J_STOP
+      J_0S = 2                  ! J_STRT_SKP
+      J_1S = JJPAR-1            ! J_STOP_SKP
+      J_0STG = 2                ! J_STRT_STGR
+      J_1STG = JJPAR            ! J_STOP_STGR
+      HAVE_SOUTH_POLE = .TRUE.
+      HAVE_NORTH_POLE = .TRUE.
+
+      ! Initialize
+      KLEV = LLPAR
+
+      II = I
+      IF ( HAVE_SOUTH_POLE .and. J .eq. 1     ) II = 1
+      IF ( HAVE_NORTH_POLE .and. J .eq. JJPAR ) II = 1
+
+      PRESSMID = 0d0
+      PK = 0d0
+      TL = 0d0
+
+      DO L=1,LLPAR
+         ! PMID = Pressure at midpoint of box (mb)
+         PRESSMID(L) = GET_PCENTER(II,J,L)
+         ! PK   = PMID**KAPA         
+         PK(L)   = PRESSMID(L)**ZKAPPA
+         ! TL here is pot temperature, "referenced to 1mb"
+         TL(L)   = State_Met%T(II,J,L)*(1d0/PRESSMID(L))**ZKAPPA
+         ! And TL is pot temp * PK
+         TL(L)   = TL(L)*PK(L)
+      ENDDO
+      CALL TROPWMO(TL, PRESSMID, PK, PTROP, LTROP, IERR )
+
+      !IF ( I .eq. 23 ) THEN
+      !   print*,J,PTROP,LTROP,GET_PCENTER(I,J,LTROP)
+      !ENDIF
+      
+      IF ( LTROP .GT. LLTROP ) THEN
+         print*,'Warning: LTROP set to LLTROP',I,J,LTROP
+         PTROP = GET_PCENTER( I, J, LLTROP )
+      ENDIF
+
+      ! Put into state variable
+      State_Met%TROPL(I,J) = LTROP
+      State_Met%TROPP(I,J) = PTROP
+
+      END SUBROUTINE CALC_TPAUSE
+!EOC
+!------------------------------------------------------------------------------
+!                  GEOS-Chem Global Chemical Transport Model                 !
+!------------------------------------------------------------------------------
+!BOP
+!
+! !IROUTINE: 
+!
+! !DESCRIPTION: 
+!\\
+!\\
+! !INTERFACE:
+!
+      SUBROUTINE TROPWMO(ptm1, papm1, pk, ptropo, ltropp,ierr)
+!******************************************************************************
+!  Directly from Model E, with minor modifications to make compatible with
+!  GEOS-Chem framework. (ltm)
+!
+!@sum  tropwmo calculates tropopasue height according to WMO formula
+!@auth D. Nodorp/T. Reichler/C. Land
+!@+    GISS Modifications by Jean Lerner/Gavin Schmidt
+!@ver  1.0
+!@alg  WMO Tropopause Definition
+!@+
+!@+ From A Temperature Lapse Rate Definition of the Tropopause Based on
+!@+ Ozone, J. M. Roe and W. H. Jasperson, 1981
+!@+
+!@+ In the following discussion the lapse rate is defined as -dT/dz.
+!@+
+!@+ The main features of the WMO tropopause definition are as follows:
+!@+ * The first tropopause (i.e., the conventional tropopause) is
+!@+   defined as the lowest level at which the lapse rate decreases to 2
+!@+   K/km or less, and the average lapse rate from this level to any
+!@+   level within the next higher 2 km does not exceed 2 K/km.
+!@+ * If above the first tropopause the average lapse rate between any
+!@+   level and all higher levels within 1 km exceed 3 K/km, then a
+!@+   second tropopause is defined by the same criterion as under the
+!@+   statement above. This tropopause may be either within or above the
+!@+   1 km layer.
+!@+ * A level otherwise satisfying the definition of tropopause, but
+!@+   occuring at an altitude below that of the 500 mb level will not be
+!@+   designated a tropopause unless it is the only level satisfying the
+!@+   definition and the average lapse rate fails to exceed 3 K/km over
+!@+   at least 1 km in any higher layer.
+!@+ * (GISS failsafe) Some cases occur when the lapse rate never falls
+!@+   below 2 K/km. In such cases the failsafe level is that where the
+!@+   lapse rate first falls below 3 K/km. If this still doesn't work
+!@+   (ever?), the level is set to the pressure level below 30mb.
+!@+
+!
+!  NOTES:
+!  (1 )
+!******************************************************************************
+! 
+      USE CMN_SIZE_MOD
+      implicit none
+
+      real*8, intent(in), dimension(llpar) :: ptm1, papm1, pk
+      real*8, intent(out) :: ptropo
+      integer, intent(out) :: ltropp,ierr
+      real*8, dimension(llpar) :: zpmk, zpm, za, zb, ztm, zdtdz
+
+      ! From Model E CONST.f
+      real*8,parameter  :: srat = 1.401d0      
+      real*8,parameter  :: zkappa = (srat - 1.)/srat ! =.2862.... ! kapa
+      real*8,parameter  :: zzkap = 1d0/zkappa ! bykapa
+      real*8,parameter  :: mair = 28.9655d0
+      real*8,parameter  :: gasc = 8.314510d0
+      real*8,parameter  :: rgas = 1d3 * gasc / mair
+      real*8,parameter  :: grav = 9.80665d0
+
+!@param zgwmo min lapse rate (* -1) needed for trop. defn. (-K/km)
+!@param zgwmo2 GISS failsafe minimum lapse rate (* -1) (-K/km)
+!@param zdeltaz distance to check for lapse rate changes (km)
+!@param zfaktor factor for caluclating height from pressure (-rgas/grav)
+!@param zplimb min pressure at which to define tropopause (mb)
+      real*8, parameter :: zgwmo  = -2d-3, zgwmo2=-3d-3,
+     *     zdeltaz = 2000.0, zfaktor = -GRAV/RGAS, zplimb=500.
+      real*8 zptph, zp2km, zag, zbg, zasum, zaquer, zptf
+      integer iplimb,iplimt, jk, jj, kcount, ltset,l
+      logical ldtdz
+      integer :: klev
+
+      klev = llpar
+
+c****
+c****  2. Calculate the height of the tropopause
+c****  -----------------------------------------
+      ltset = -999
+      ierr=0
+      iplimb=1
+c**** set limits based on pressure
+      do jk=2,klev-1
+        if (papm1(jk-1).gt.600d0) then
+          iplimb=jk
+        else
+          if (papm1(jk).lt.30d0) exit
+        end if
+      end do
+      iplimt=jk
+c****
+c****  2.1 compute dt/dz
+c****  -----------------
+c****       ztm  lineare Interpolation in p**kappa
+c****     gamma  dt/dp = a * kappa + papm1(jx,jk)**(kappa-1.)
+
+      do jk=iplimb+1,iplimt       ! -1 ?????
+        zpmk(jk)=0.5*(pk(jk-1)+pk(jk))
+
+        zpm(jk)=zpmk(jk)**zzkap ! p mitte (middle)
+
+        za(jk)=(ptm1(jk-1)-ptm1(jk))/(pk(jk-1)-pk(jk))
+        zb(jk) = ptm1(jk)-(za(jk)*pk(jk))
+
+        ztm(jk)=za(jk)*zpmk(jk)+zb(jk) ! T mitte
+        zdtdz(jk)=zfaktor*zkappa*za(jk)*zpmk(jk)/ztm(jk)
+      end do
+c****
+c****  2.2 First test: valid dt/dz ?
+c****  -----------------------------
+c****
+      do 1000 jk=iplimb+1,iplimt-1
+
+c**** GISS failsafe test
+        if (zdtdz(jk).gt.zgwmo2.and.ltset.ne.1) then
+          ltropp=jk
+          ltset =1
+        end if
+c****
+        if (zdtdz(jk).gt.zgwmo .and. ! dt/dz > -2K/km
+     &       zpm(jk).le.zplimb) then ! zpm not too low
+          ltropp = jk
+          ltset = 1
+c****
+c****  2.3 dtdz is valid > something in German
+c****  ----------------------------------------
+c****    1.lineare in p^kappa (= Dieters neue Methode)
+
+          zag = (zdtdz(jk)-zdtdz(jk+1))/
+     &         (zpmk(jk)-zpmk(jk+1)) ! a-gamma
+          zbg = zdtdz(jk+1) - zag*zpmk(jk+1) ! b-gamma
+          if(((zgwmo-zbg)/zag).lt.0.) then
+            zptf=0.
+          else
+            zptf=1.
+          end if
+          zptph = zptf*abs((zgwmo-zbg)/zag)**zzkap
+          ldtdz=zdtdz(jk+1).lt.zgwmo
+          if(.not.ldtdz) zptph=zpm(jk)
+c****
+c****  2.4 2nd test: dt/dz above 2km must not be lower than -2K/km
+c****  -----------------------------------------------------------
+c****
+          zp2km = zptph + zdeltaz*zpm(jk)
+     &         / ztm(jk)*zfaktor ! p at ptph + 2km
+          zasum = 0.0           ! zdtdz above
+          kcount = 0            ! number of levels above
+c****
+c****  2.5 Test until pm < p2km
+c****  --------------------------
+c****
+          do jj=jk,iplimt-1
+            if(zpm(jj).gt.zptph) cycle ! doesn't happen
+            if(zpm(jj).lt.zp2km) goto 2000 ! ptropo valid
+            zasum = zasum+zdtdz(jj)
+            kcount = kcount+1
+            zaquer = zasum/float(kcount) ! dt/dz mean
+            if(zaquer.le.zgwmo) goto 1000 ! dt/dz above < 2K/1000
+                                          ! discard it
+          end do                ! test next level
+          goto 2000
+        endif
+ 1000 continue                  ! next level
+ 2000 continue
+
+      if (ltset.eq.-999) then
+        ltropp=iplimt-1  ! default = last level below 30mb
+        print*,"In tropwmo ltropp not set, using default: ltropp ="
+     *       ,ltropp
+        write(6,'(12(I4,5F10.5,/))') (l,ptm1(l),papm1(l),pk(l),zdtdz(l)
+     *       ,zpm(l),l=iplimb+1,iplimt-1)
+        ierr=1
+      end if
+      ptropo = papm1(ltropp)
+c****
+      return
+      END SUBROUTINE TROPWMO
+!EOC
+!------------------------------------------------------------------------------
+!                  GEOS-Chem Global Chemical Transport Model                 !
 !------------------------------------------------------------------------------
 !BOP
 !
@@ -953,7 +1301,7 @@
 !------------------------------------------------------------------------------
 !BOC
 
-#if   defined( GCAP )
+#if   defined( MODELE ) || defined( GCAP )
 
       !--------------------------
       ! GCAP
@@ -1039,7 +1387,7 @@
 !------------------------------------------------------------------------------
 !BOC
 
-#if   defined( GCAP )
+#if   defined( MODELE ) || defined( GCAP )
 
       !--------------------------
       ! GCAP
@@ -1106,14 +1454,19 @@
 !------------------------------------------------------------------------------
 !BOC
 
-#if   defined( GCAP )
+#if   defined( GISS ) || defined( GCAP )
 
       !--------------------------
       ! GCAP
       !--------------------------
 
       ! It's an ice box if 50% or more of the box is covered by ice
+#if defined( ICECAP )
+      ICE = ( State_Met%SNICE(I,J)   >= 0.5d0 .or. 
+     &        State_Met%LGM_ICE(I,J) >= 0.5d0      )
+#else
       ICE = ( State_Met%SNICE(I,J) >= 0.5d0 )
+#endif
 
 #else
 
@@ -1219,7 +1572,7 @@
             ! If it's an ice box, skip to next neighbor
             IF ( IS_ICE( LONGI, LATJ, State_Met ) ) CYCLE
 
-#if   defined( GCAP ) 
+#if   defined( MODELE ) || defined( GCAP ) 
 
             !---------------------------------------------------
             ! GCAP met fields
@@ -1493,7 +1846,7 @@
 !------------------------------------------------------------------------------
 !BOC
 
-#if   defined( GCAP )
+#if   defined( MODELE ) || defined( GCAP )
 
       !=================================================================
       ! For GCAP met fields (based on GISS model)
@@ -2068,7 +2421,7 @@
       ! COPY_I6_FIELDS begins here!
       !=================================================================
 
-#if   defined( GCAP )
+#if   defined( MODELE ) || defined( GCAP )
 
       !------------------
       ! GCAP met

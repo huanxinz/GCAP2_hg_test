@@ -382,7 +382,7 @@
       ! JD1: Astronomical Julian Date at current time
       JD1 = JD0 + ( DBLE( ELAPSED_MIN ) / 1440d0 )
 
-#if   defined( GCAP ) 
+#if   defined( MODELE ) || defined( GCAP )
       !-----------------------------------------------------------------
       ! Special handling for GCAP met fields #1:
       ! Force JD1 to skip ahead by the # of Feb 29ths that we have
@@ -397,7 +397,7 @@
       ! Extract current year, month, day from NYMD
       CALL YMD_EXTRACT( NYMD, YEAR, MONTH, DAY )
 
-#if   defined( GCAP ) 
+#if   defined( MODELE ) || defined( GCAP )
 
       !-----------------------------------------------------------------
       ! Special handling for GCAP met fields #2:
@@ -1614,7 +1614,7 @@
          CALL CALDATE( JD, DATE(1), DATE(2) )
       ENDIF
 
-#if   defined( GCAP )
+#if   defined( MODELE ) || defined( GCAP )
 
       !-------------------------------
       ! GCAP met fields: no leapyears
@@ -3036,7 +3036,7 @@
       LOGICAL, SAVE :: FIRST = .TRUE.
       INTEGER       :: HH, MM, SS, MINS, OFFSET
 
-#if   defined( GCAP ) 
+#if   defined( MODELE ) || defined( GCAP ) 
 
       !=================================================================
       ! GCAP MET FIELDS: There are no leapyears; adjust accordingly
@@ -3211,7 +3211,7 @@
 !
       INTEGER :: HH, MM, SS, MINS, OFFSET
 
-#if   defined( GCAP )
+#if   defined( MODELE ) || defined( GCAP )
 
       !==================================================================
       ! GCAP MET FIELDS
@@ -3659,7 +3659,7 @@
 !
       INTEGER :: DATE(2)
 
-#if   defined( GCAP )
+#if   defined( MODELE ) || defined( GCAP )
 
       !-----------------------------------------------------------------
       ! For GCAP met only 
@@ -3740,7 +3740,7 @@
 !
       INTEGER :: DATE(2)
 
-#if   defined( GCAP )
+#if   defined( MODELE ) || defined( GCAP )
 
       !-----------------------------------------------------------------
       ! For GCAP met only 
@@ -4096,7 +4096,7 @@
       !=================================================================
       IS_LEAPYEAR = .FALSE.
 
-#if   defined( GCAP )
+#if   defined( MODELE ) || defined( GCAP )
       ! For GCAP met fields, there are no leap years.  However, sometimes
       ! we need to test to see if it would be a leap year so that we can
       ! tell the GEOS-Chem timing functions to skip past Feb 29th.  If 

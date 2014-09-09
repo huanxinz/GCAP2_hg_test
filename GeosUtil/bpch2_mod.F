@@ -33,7 +33,8 @@
       PUBLIC  :: GET_NAME_EXT        
       PUBLIC  :: GET_NAME_EXT_2D     
       PUBLIC  :: GET_RES_EXT         
-      PUBLIC  :: GET_HALFPOLAR       
+      PUBLIC  :: GET_HALFPOLAR
+      PUBLIC  :: GET_CENTER180
       PUBLIC  :: GET_TAU0
 
       INTERFACE GET_TAU0
@@ -689,6 +690,12 @@
 #elif defined( GCAP )
       MODELNAME = 'GCAP'
 
+#elif defined( MODELE ) && defined( GRIDM23 )
+      MODELNAME = 'GISSM23'
+
+#elif defined( MODELE ) && defined( GRIDF40 )
+      MODELNAME = 'GISSF40'
+
 #elif defined( MERRA ) && defined( GRIDREDUCED )
       MODELNAME = 'MERRA_47L'
       
@@ -738,6 +745,10 @@
 #elif defined( GCAP )
       CHARACTER(LEN=4) :: NAME_EXT
       NAME_EXT = 'gcap'
+
+#elif defined( MODELE )
+      CHARACTER(LEN=4) :: NAME_EXT
+      NAME_EXT = 'giss'
 
 #elif defined( MERRA )
       CHARACTER(LEN=5) :: NAME_EXT
@@ -875,6 +886,14 @@
       CHARACTER(LEN=8) :: RES_EXT
       RES_EXT = 'external'
 
+#elif defined( GRIDM23 ) 
+      CHARACTER(LEN=3) :: RES_EXT
+      RES_EXT = 'm23'
+
+#elif defined( GRIDF40 ) 
+      CHARACTER(LEN=3) :: RES_EXT
+      RES_EXT = 'f40'
+
 #endif
 !
 ! !REVISION HISTORY:
@@ -922,7 +941,7 @@
 
 #else
 
-      ! All GEOS grids have half-sized polar boxes
+      ! All GEOS grids and GISS M23 have half-sized polar boxes
       HALFPOLAR = 1
 
 #endif
@@ -932,6 +951,46 @@
 !EOC
 !------------------------------------------------------------------------------
 !                  GEOS-Chem Global Chemical Transport Model                  !
+!------------------------------------------------------------------------------
+!BOP
+!
+! !IROUTINE: get_center180
+!
+! !DESCRIPTION: Function GET\_CENTER180 returns 1 if the current grid has 
+!  half-sized polar boxes (e.g. GEOS), or zero otherwise (e.g. GCAP).  
+!\\
+!\\
+! !INTERFACE:
+!
+      FUNCTION GET_CENTER180() RESULT( CENTER180 )
+!
+! !RETURN VALUE:
+!
+      INTEGER :: CENTER180  ! =1 if we have half-sized polar boxes, =0 if not
+!
+! !REVISION HISTORY:
+!  06 Jul 2014 - L. Murray - Initial version
+!EOP
+!------------------------------------------------------------------------------
+!BOC
+! 
+#if   defined( MODELE ) 
+
+      ! GISS grids have an edge at the international date line
+      CENTER180 = 0
+
+#else
+
+      ! GEOS grids stradle the international date line
+      CENTER180 = 1
+
+#endif
+
+      ! Return to calling program
+      END FUNCTION GET_CENTER180
+!EOC
+!------------------------------------------------------------------------------
+!                  GEOS-Chem Global Chemical Transport Model                 !
 !------------------------------------------------------------------------------
 !BOP
 !

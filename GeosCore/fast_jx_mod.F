@@ -323,6 +323,11 @@
             ! Surface albedo [unitless] at (NLON,NLAT)
             SFCA            = State_Met%UVALBEDO(NLON,NLAT)
 
+#if defined( GISS )
+            ! Use total simulated column, including mesosphere
+            O3_TOMS         = 0d0
+            O3_CTM(1:LLPAR) = State_Chm%Tracers(NLON,NLAT,1:LLPAR,IDTO3)
+#else
             ! Overhead ozone column [DU] at (NLON, NLAT)
             O3_TOMS         = GET_OVERHEAD_O3( NLON, NLAT )
             
@@ -330,6 +335,7 @@
             O3_CTM          = 0d0
             L               = GET_CHEMGRID_LEVEL(NLON,NLAT,State_Met)
             O3_CTM(1:L)     = State_Chm%Tracers(NLON,NLAT,1:L,IDTO3)
+#endif
 
             ! Aerosol OD profile [unitless] at (NLON,NLAT)
             OPTAER          = ODAER(NLON,NLAT,:,:)

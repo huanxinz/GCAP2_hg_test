@@ -204,8 +204,13 @@ CONTAINS
           ! Loop over local longitudes
           DO I = I1, I2
 
+#if defined( MODELE )
+             ! Longitude centers (do not straddle Int'l Date Line)
+             XMID(I,J,L)  = ( DLON(I,J,L) * IND_X(I) ) - 180d0 + ( DLON(I,J,L) * 0.5d0 )          
+#else
              ! Longitude centers
              XMID(I,J,L)  = ( DLON(I,J,L) * IND_X(I) ) - 180d0
+#endif
           
              ! Longitude edges
              XEDGE(I,J,L) = XMID(I,J,L) - ( DLON(I,J,L) * 0.5d0 )
@@ -597,6 +602,7 @@ CONTAINS
   END SUBROUTINE Set_xOffSet
 !EOC
 !------------------------------------------------------------------------------
+!                  GEOS-Chem Global Chemical Transport Model                 !
 !------------------------------------------------------------------------------
 !BOP
 !

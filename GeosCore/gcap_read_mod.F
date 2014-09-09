@@ -110,7 +110,7 @@
       NYMD     = 20000101
 
       ! Strings for directory & filename
-      GEOS_DIR = TRIM( Input_Opt%GCAP_DIR )
+      GEOS_DIR = TRIM( Input_Opt%GISS_DIR )
       PHIS_STR = 'YYYYMMDD.phis.' // GET_RES_EXT() 
 
       ! Replace date tokens
@@ -261,7 +261,7 @@
       IF ( NHMS == 000000 .or. FIRST ) THEN
 
          ! Strings for directory & filename
-         GEOS_DIR  = TRIM( Input_Opt%GCAP_DIR )
+         GEOS_DIR  = TRIM( Input_Opt%GISS_DIR )
          PHIS_FILE = 'YYYYMMDD.phis.' // GET_RES_EXT() 
 
          ! Replace date tokens

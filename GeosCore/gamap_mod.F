@@ -6796,7 +6796,11 @@
       IF ( ND66 > 0 .or. DO_TIMESERIES ) THEN
 
          ! Number of tracers
+#if defined( MODELE )
+         NTRAC(66) = 16
+#else
          NTRAC(66) = 6
+#endif
 
          ! Loop over tracers
          DO T = 1, NTRAC(66)
@@ -6822,13 +6826,51 @@
 #elif defined( GEOS_5 ) || defined( MERRA ) || defined( GEOS_FP )
                   NAME(T,66) = 'CMFMC'
                   UNIT(T,66) = 'kg/m2/s'
+#elif defined( MODELE )
+                  NAME(T,66) = 'C_UP1' ! Updraft undiluting plume
+                  UNIT(T,66) = 'Pa/s'
 #else
                   NAME(T,66) = 'CLDMAS'
                   UNIT(T,66) = 'kg/m2/s'
 #endif
                CASE( 6 )
+#if !defined( MODELE )
                   NAME(T,66) = 'DTRAIN'
                   UNIT(T,66) = 'kg/m2/s'
+#else
+                  NAME(T,66) = 'C_UP2' ! Updraft entraining plume
+                  UNIT(T,66) = 'Pa/s'
+               CASE( 7 )
+                  NAME(T,66) = 'C_DD1' ! Dndrft undiluted plume
+                  UNIT(T,66) = 'Pa/s'
+               CASE( 8 )
+                  NAME(T,66) = 'C_DD2' ! Dndrft entraining plume
+                  UNIT(T,66) = 'Pa/s'
+               CASE( 9 )
+                  NAME(T,66) = 'C_EU1' ! Entrainment 800mb by UP1
+                  UNIT(T,66) = 'Pa/s'
+               CASE( 10 )
+                  NAME(T,66) = 'C_EU2' ! Entrainment by UP2
+                  UNIT(T,66) = 'Pa/s'
+               CASE( 11 )
+                  NAME(T,66) = 'C_ED1' ! Entrainment by DD1
+                  UNIT(T,66) = 'Pa/s'
+               CASE( 12 )
+                  NAME(T,66) = 'C_ED2' ! Entrainment by DD2
+                  UNIT(T,66) = 'Pa/s'
+               CASE( 13 )
+                  NAME(T,66) = 'C_OU1' ! Entrainment by UP1
+                  UNIT(T,66) = 'Pa/s'
+               CASE( 14 )
+                  NAME(T,66) = 'C_OU2' ! Entrainment by UP2
+                  UNIT(T,66) = 'Pa/s'
+               CASE( 15 )
+                  NAME(T,66) = 'C_OD1' ! Entrainment by DD1
+                  UNIT(T,66) = 'Pa/s'
+               CASE( 16 )
+                  NAME(T,66) = 'C_OD2' ! Entrainment by DD1
+                  UNIT(T,66) = 'Pa/s'
+#endif
                CASE DEFAULT
                   ! Nothing
             END SELECT

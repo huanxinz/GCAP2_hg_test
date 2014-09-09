@@ -967,6 +967,7 @@
 ! !USES:
 !
       USE BPCH2_MOD,  ONLY : BPCH2,         GET_HALFPOLAR
+      USE BPCH2_MOD,  ONLY : GET_CENTER180
       USE BPCH2_MOD,  ONLY : GET_MODELNAME, OPEN_BPCH2_FOR_WRITE
       USE GRID_MOD,   ONLY : GET_XOFFSET,   GET_YOFFSET
       USE inquireMod, ONLY : findFreeLUN
@@ -992,7 +993,7 @@
       INTEGER            :: I, J, L, N, IOS
       INTEGER            :: IFIRST, JFIRST, LFIRST
       INTEGER            :: HALFPOLAR 
-      INTEGER, PARAMETER :: CENTER180 = 1 
+      INTEGER            :: CENTER180
       REAL*4             :: LONRES, LATRES
       REAL*4             :: ARRAY(IIPAR,JJPAR,LLCHEM)
       CHARACTER(LEN=20)  :: MODELNAME
@@ -1016,6 +1017,7 @@
       LATRES    = DJSIZE
       MODELNAME = GET_MODELNAME()
       HALFPOLAR = GET_HALFPOLAR()
+      CENTER180 = GET_CENTER180() 
       IFIRST    = 1 + GET_XOFFSET( GLOBAL=.TRUE. )
       JFIRST    = 1 + GET_YOFFSET( GLOBAL=.TRUE. )
       LFIRST    = 1

@@ -239,7 +239,7 @@
 #elif defined( GEOS_5 ) || defined( MERRA )
       !EMISSION = 0d0           ! to be determined later
 
-#elif defined( GCAP )
+#elif defined( MODELE ) || defined( GCAP )
       EMISSION = EMISSION / 3.5d0
 
 #endif

@@ -360,6 +360,7 @@
 !
       USE BPCH2_MOD,       ONLY : GET_TAU0
       USE DIRECTORY_MOD,   ONLY : DATA_DIR_NATIVE => DATA_DIR_1x1
+      USE DIRECTORY_MOD,   ONLY : DATA_DIR
       USE JULDAY_MOD,      ONLY : JULDAY
       USE JULDAY_MOD,      ONLY : CALDATE
       USE LOGICAL_MOD,     ONLY : LFUTURE
@@ -370,6 +371,8 @@
       USE TIME_MOD,        ONLY : TIMESTAMP_STRING
       USE TIME_MOD,        ONLY : GET_DAY
       USE TIME_MOD,        ONLY : GET_HOUR
+      USE TIME_MOD,        ONLY : GET_MONTH
+      USE TIME_MOD,        ONLY : GET_YEAR
       USE TIME_MOD,        ONLY : GET_DAY_OF_YEAR
       USE TIME_MOD,        ONLY : ITS_A_LEAPYEAR
       USE GLOBAL_GRID_MOD, ONLY : GET_XEDGE_G
@@ -378,8 +381,14 @@
       USE GRID_MOD,        ONLY : GET_YEDGE
       USE GRID_MOD,        ONLY : GET_XOFFSET
       USE GRID_MOD,        ONLY : GET_YOFFSET
+      USE GRID_MOD,        ONLY : GET_AREA_M2
+      USE GRID_MOD,        ONLY : GET_AREA_CM2
       USE ERROR_MOD,       ONLY : ALLOC_ERR
-      USE REGRID_A2A_MOD,  ONLY : MAP_A2A
+      USE REGRID_A2A_MOD
+
+      USE m_netcdf_io_open
+      USE m_netcdf_io_read
+      USE m_netcdf_io_close
 
       USE CMN_SIZE_MOD                                       ! Size parameters
 !
@@ -416,7 +425,7 @@
 ! !LOCAL VARIABLES:
 !
       LOGICAL, SAVE       :: FIRST = .TRUE.
-      INTEGER             :: I,    J,  N,   NF , IT3
+      INTEGER             :: I,    J,  N,   NF, IT3, P
       INTEGER             :: AS
       INTEGER             :: II,   JJ
       INTEGER             :: I0,   J0
@@ -440,9 +449,16 @@
       CHARACTER(LEN=16 )  :: TIME_STR
       INTEGER             :: DD, HH, DOY
       INTEGER             :: IT3HR, IT3H
+      INTEGER             :: MONTH
       REAL*4              :: DEG2RAD
       REAL*8, ALLOCATABLE :: bq1(:,:)
       REAL*8, ALLOCATABLE :: bq2(:,:)
+
+      INTEGER             :: ncID
+      CHARACTER(LEN=255)  :: FILENAME
+      REAL*8              :: DM_BURNED(720,360,9), GCD_SF
+      REAL*4              :: EMISSNC(720,360)
+      INTEGER             :: BIOME(720,360)
 
       !=================================================================
       ! GFED3_COMPUTE_BIOMASS begins here!
@@ -525,7 +541,9 @@
       ! But go to statement 999 to check if daily fractiions
       ! need to be read.
       IF ( .not. UPDATED_MON ) THEN
+#if !defined( MODELE )
             go to 999
+#endif
       ENDIF
       
       ! Echo info
@@ -540,8 +558,10 @@
          
       ! Availability of MONTHLY data
       !-------------------------------
-         
+
+#if !defined( MODELE )         
       CALL GFED3_AVAILABLE( YYYY, 1997, 2011 )
+#endif
 
       ! Create YYYYMMDD integer values
       YYYYMMDD = YYYY*10000 + MM*100 + 01
@@ -571,6 +591,139 @@
       ! Number of seconds in this month 
       ! (NOTE: its value will be saved until the next month)
       SECONDS  = ( TAU1 - TAU0 ) * 3600d0
+
+#if defined( GISS ) && defined( ICECAP )
+
+      ! File name with DM emissions from LPJ-SPITFIRE2
+      ! Both SPITFIRE and GFED3 are on 0.5 x 0.5 grids, so no need to do
+      ! add'l regridding.
+      
+      ! GCD_SF is a scaling factor that adjusts the SPITFIRE2 total flux
+      ! to match percentage differences in carbon burnt implied by the 
+      ! Global Charcoal Database [Power et al., 2008]. First the total DM
+      ! burned is scaled from the SPITFIRE2 output to match the PD
+      ! value from GFED3, 4.2 Pg a-1 [van der Werf, 2010].
+      ! Charcoal database implies 18-23k global median charcoal
+      ! accumulation rates were about 10% of PI/PD.
+      GCD_SF = 1d0
+      SELECT CASE ( GET_YEAR() )
+         CASE( 1990:1999 )
+            FILENAME = "to.be.determined"
+         CASE( 2100:2199 )
+            FILENAME = "PI_people.nc"
+            GCD_SF = (1d0    ) * 4.2d0 / 17.83d0
+         CASE( 2200:2299 )
+            FILENAME = "WB_people.nc"
+            GCD_SF = (1d-1   ) * 4.2d0 / 10.61d0
+         CASE( 2300:2399 )
+            FILENAME = "CM_people.nc"
+            GCD_SF = (1d-1   ) * 4.2d0 / 9.81d0
+         END SELECT
+
+      FILENAME = TRIM(DATA_DIR) // 'lpjspitfire2_201211/' // 
+     &     TRIM( FILENAME )
+      
+      ! Reset array that holds
+      DM_GFED3_MON(:,:,:) = 0d0
+
+      ! Open LPJ+SPITFIRE2 output file
+      call NcOp_Rd( ncID, TRIM( FILENAME ) )
+
+      ! Read in carbon burned per pft
+      ! kg DM burned pft-1 gridcell-1 month-1
+      MONTH = GET_MONTH()
+      call NcRd( DM_BURNED, ncID, 'mBBpft_tavg',  
+     &     (/   1, 1, 1, month /),  (/ 720, 360, 9, 1 /) ) ! Start & Count
+      ! Replace missing data with 0d0
+      WHERE ( DM_Burned < 0D0 ) DM_Burned = 0d0
+
+      DM_burned = DM_burned * GCD_SF
+
+      ! Close netCDF file
+      call NcCl( ncID )
+
+      ! Portion carbon burned for different emission factors
+      DO I=1,720
+      DO J=1,360
+      DO P=1,9
+         ! In kg month-1
+         SELECT CASE( P )
+            ! Extratropical forest
+            CASE( 3, 4, 5, 6, 7 )
+               DM_GFED3_MON(I,J,3) = DM_GFED3_MON(I,J,3) + 
+     &              DM_Burned(I,J,P) 
+
+            ! Savannah (and barren types)
+            CASE( 8, 9 )
+               DM_GFED3_MON(I,J,5) = DM_GFED3_MON(I,J,5) + 
+     &              DM_Burned(I,J,P) 
+
+            ! Woodland
+            CASE( 1, 2 )
+               DM_GFED3_MON(I,J,6) = DM_GFED3_MON(I,J,6) + 
+     &              DM_Burned(I,J,P) 
+
+            ! Peat
+            ! We have no peat biomes
+
+            ! Just in case
+            CASE DEFAULT
+               STOP
+         END SELECT
+      ENDDO
+      ENDDO
+      ENDDO
+
+      DM_GFED3 = DM_GFED3_MON
+
+      ! Loop over biomass species 
+      DO N = 1, N_SPEC
+
+         DO J = 1, JGFED3
+         DO I = 1, IGFED3
+            BIOMASS_GFED3(I,J,N) = 0.0
+            DO NF = 1, N_EMFAC
+               GFED3_EMFACX=GFED3_EMFAC(N,NF)
+
+               ! Use woodland emission factors for 'deforestation' outside
+               ! humid tropical forest 
+               IF(NF.EQ.2.AND.HUMTROP_GFED3(I,J).EQ.0)
+     &            GFED3_EMFACX=GFED3_EMFAC(N,6)
+                  BIOMASS_GFED3(I,J,N) =  BIOMASS_GFED3(I,J,N) +
+     &                                    DM_GFED3(I,J,NF) *
+     &                                    GFED3_EMFACX
+
+            ENDDO 
+         ENDDO
+         ENDDO
+
+         ! Regrid emissions from GFED3 grid to model grid
+         ALLOCATE( bq1( IGFED3, JGFED3 ), STAT=AS )
+         IF ( AS /= 0 ) CALL ALLOC_ERR( 'bq1' )
+         ALLOCATE( bq2( IIIPAR0, JJJPAR0 ), STAT=AS )
+         IF ( AS /= 0 ) CALL ALLOC_ERR( 'bq2' )
+
+         bq1(:,:)=BIOMASS_GFED3(:,:,N)
+
+         ! Regrid from 0.5 x 0.5 to actual resolution
+         CALL DO_REGRID_A2A( TRIM(DATA_DIR_NATIVE) //
+     &        'MAP_A2A_Regrid_201203/MAP_A2A_latlon_generic05x05.nc',
+     &        720, 360, 
+     &        bq1,  bq2, IS_MASS=1, netCDF=.TRUE. )
+
+         DO JJ=1,JJPAR
+         DO II=1,IIPAR
+            BIOMASS_MODEL(II,JJ,N)=bq2(II+I0,JJ+J0) /
+     &           GET_AREA_CM2(II,JJ,1)
+         END DO
+         END DO
+
+         DEALLOCATE( bq1 )
+         DEALLOCATE( bq2 )
+
+      END DO
+
+#else
 
       ! File name with GFED3 DM emissions
       FILENAME1 = TRIM( DATA_DIR_NATIVE ) //
@@ -833,6 +986,8 @@
          DEALLOCATE( bq2 )
 
       END DO
+
+#endif
 
       ! Compute future biomass emissions (if necessary)
       IF ( LFUTURE ) THEN

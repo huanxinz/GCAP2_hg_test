@@ -468,6 +468,7 @@
       USE BPCH2_MOD,          ONLY : BPCH2
       USE BPCH2_MOD,          ONLY : GET_MODELNAME
       USE BPCH2_MOD,          ONLY : GET_HALFPOLAR
+      USE BPCH2_MOD,          ONLY : GET_CENTER180
       !USE DIAG_MOD,          ONLY : CTOTH
       USE FILE_MOD,           ONLY : IU_BPCH
       USE GIGC_Input_Opt_Mod, ONLY : OptInput
@@ -531,7 +532,7 @@
       IF ( ND42 == 0 ) RETURN
 
       ! Initialize
-      CENTER180 = 1
+      CENTER180 = GET_CENTER180()
       DIAGb     = GET_DIAGb()
       DIAGe     = GET_DIAGe()
       HALFPOLAR = GET_HALFPOLAR()

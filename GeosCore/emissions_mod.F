@@ -232,6 +232,7 @@
       LOGICAL :: ITS_A_POPS_SIM
       LOGICAL :: ITS_A_CO2_SIM
       LOGICAL :: ITS_A_H2HD_SIM
+      LOGICAL :: LANTHRO
       LOGICAL :: LBIOMASS
       LOGICAL :: LSTREETS
       LOGICAL :: LRETRO
@@ -279,6 +280,7 @@
       ITS_A_POPS_SIM     = Input_Opt%ITS_A_POPS_SIM
       ITS_A_CO2_SIM      = Input_Opt%ITS_A_CO2_SIM
       ITS_A_H2HD_SIM     = Input_Opt%ITS_A_H2HD_SIM
+      LANTHRO            = Input_Opt%LANTHRO
       LBIOMASS           = Input_Opt%LBIOMASS
       LSTREETS           = Input_Opt%LSTREETS
       LRETRO             = Input_Opt%LRETRO
@@ -337,11 +339,13 @@
 !----------------------------------------------------------------------------
          CALL COMPUTE_BIOMASS_EMISSIONS
      &      ( am_I_Root, GET_YEAR(), MONTH,     
-     &        Input_Opt, State_Chm, RC      )  
+     &        Input_Opt, State_Chm, State_Met, RC      )  
       ENDIF
          
       ! Test by simulation type
       IF ( ITS_A_FULLCHEM_SIM ) THEN
+
+         IF ( LANTHRO ) THEN
 
          !--------------------
          ! NOx-Ox-HC-aerosol
@@ -454,6 +458,8 @@
          CALL EMISSC2H6
      &      ( am_I_Root, Input_Opt, State_Met, State_Chm, RC )
 
+         ENDIF ! LANTHRO
+
 #if defined( UCX ) 
          ! Simplified emissions of N2O, OCS and CFCs (SDE 04/04/13)
          IF ( LBASICEMIS ) THEN
@@ -509,6 +515,8 @@
          !--------------------
          ! Offline aerosol
          !--------------------
+
+         IF ( LANTHRO ) THEN
 
          ! Read David Streets' emisisons over China / SE ASia
          IF ( LSTREETS .and. ITS_A_NEW_MONTH() ) THEN
@@ -587,6 +595,8 @@
      &         ( am_I_Root, Input_Opt, State_Chm, RC )
          ENDIF
 
+         ENDIF ! LANTHRO
+
          ! Seasalt aerosol emission
          IF ( LSSALT ) THEN 
             CALL EMISSSEASALT
@@ -643,6 +653,8 @@
          !--------------------
          ! Tagged CO
          !--------------------
+
+         IF ( LANTHRO ) THEN
 
          ! Read David Streets' emisisons over China / SE ASia
          ! Bug fix: call every month now (pdk, phs, 3/17/09)
@@ -714,6 +726,8 @@
             CALL EMISS_ICOADS_SHIP( am_I_Root, Input_Opt,
      &                              State_Chm, RC         )
          ENDIF
+
+         ENDIF ! LANTHRO
 
          ! Now call EMISSDR for Tagged CO fossil fuel emissions, 
          ! so that we get the same emissions for Tagged CO as 

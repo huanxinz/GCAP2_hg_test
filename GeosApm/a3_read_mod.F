@@ -151,7 +151,7 @@
 #elif defined( GCAP )
 
          ! Strings for directory & filename
-         GEOS_DIR = TRIM( Input_Opt%GCAP_DIR )
+         GEOS_DIR = TRIM( Input_Opt%GISS_DIR )
          A3_STR   = 'YYYYMMDD.a3.' // GET_RES_EXT()
 
 #endif
@@ -413,7 +413,7 @@
 #elif defined( GCAP )
 
          ! Strings for directory & filename
-         GEOS_DIR = TRIM( Input_Opt%GCAP_DIR )
+         GEOS_DIR = TRIM( Input_Opt%GISS_DIR )
          A3_FILE  = 'YYYYMMDD.a3.' // GET_RES_EXT()
 
 #endif

@@ -305,7 +305,17 @@
       ! Find a free file LUN
       IUNIT = findFreeLUN()
       
-#if   defined( GRID4x5  )
+#if   defined( GRIDM23  ) || defined( GRIDF40 )
+      
+!     Eliminate need for the ancient MELD_ file. These are the values 
+!     from MELD_N96_70_HC. Note, this can elimate all the following for
+!     all grid resolutions.
+      TODN = (/ 0.65, 0.65, 1.35, 1.35, 1.20, 0.80 /)
+      TODH = (/ 0.45, 0.60, 1.45, 1.40, 1.45, 0.65 /)
+      TODB = (/ 0.00, 0.00, 0.70, 1.60, 0.70, 0.00 /)
+      SCNR89 = 0e0
+
+#elif defined( GRID4x5  )
 
       ! Define the file name
       FILENAME = TRIM( DATA_DIR ) // 'fossil_200104/MELD_N96_70_HC'
@@ -527,7 +537,7 @@
       FILENAME = TRIM( DATA_DIR ) // 'fossil_obsolete/merge.' // 
      &           GET_RES_EXT()    // '_CTM'
 
-#if   defined( GRID4x5 )
+#if   defined( GRID4x5 ) || defined( GRIDM23 )
       ! For 4x5, the old ASCII file had the "_SASS" extension.
       ! This is historical baggage (bmy, 4/3/02)
       FILENAME = TRIM( FILENAME ) // '_SASS' 
@@ -607,7 +617,8 @@
 !
       ! References to F90 modules
       USE BPCH2_MOD,     ONLY : GET_NAME_EXT_2D, GET_RES_EXT, READ_BPCH2
-      USE DIRECTORY_MOD, ONLY : DATA_DIR
+      USE DIRECTORY_MOD, ONLY : DATA_DIR, DATA_DIR_1x1
+      USE REGRID_A2A_MOD
 
       USE CMN_SIZE_MOD            ! Size parameters
 
@@ -625,21 +636,295 @@
 
       ! Local variables
       INTEGER                       :: L
+#if defined( MODELE )
+      REAL*4                        :: ARRAY(144,91,2)
+      REAL*8, TARGET                :: ARRAY8(144,91)
+      CHARACTER(LEN=255)            :: LLFILENAME
+      REAL*8, POINTER               :: INGRID (:,:) => NULL()
+      REAL*8                        :: OUTGRID(IIPAR,JJPAR)
+#else
       REAL*4                        :: ARRAY(IIPAR,JJPAR,2)
+#endif
       CHARACTER(LEN=255)            :: FILENAME
 
       !=================================================================
       ! READ_GEIA begins here!
       !=================================================================
 
+#if defined( MODELE )
+      ! Define the binary punch file name
+      FILENAME = TRIM( DATA_DIR_1x1 )                      //
+     &           'fossil_200104/merge_nobiofuels.geos.2x25'
+#else
       ! Define the binary punch file name
       FILENAME = TRIM( DATA_DIR )                          //
      &           'fossil_200104/merge_nobiofuels.'         //
      &           GET_NAME_EXT_2D() // '.' // GET_RES_EXT() 
+#endif
       
       ! Write file name to stdout
       WRITE( 6, 100 ) TRIM( FILENAME )
  100  FORMAT( 'READ_GEIA: Reading ', a )
+
+
+#if defined( MODELE )
+
+      LLFILENAME = TRIM( DATA_DIR_1x1) //
+     &     'MAP_A2A_Regrid_201203/MAP_A2A_latlon_geos2x25.nc'
+
+      !=================================================================
+      ! Read NOx (tracer #1): 4 seasons, 2 levels
+      !=================================================================
+      IF ( PRESENT( E_NOX ) ) THEN
+
+         ! Read winter NOx (DJF)
+         CALL READ_BPCH2( FILENAME, 'ANTHSRCE', 1,  
+     &                    -744d0,    144,     91,     
+     &                    2,         ARRAY,     QUIET=.TRUE. )
+         
+         DO L = 1, 2
+            ARRAY8(:,:) = ARRAY(:,:,L)
+            INGRID => ARRAY8
+            CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &           INGRID, OUTGRID, IS_MASS=0, NetCDF=.TRUE. )
+            E_NOX(:,:,1,L) = OUTGRID
+            NULLIFY( INGRID )
+         ENDDO
+      
+         ! Read spring NOx (MAM)
+         CALL READ_BPCH2( FILENAME, 'ANTHSRCE', 1,  
+     &                    1416d0,    144,     91,     
+     &                    2,         ARRAY,     QUIET=.TRUE. )
+
+         DO L = 1, 2
+            ARRAY8(:,:) = ARRAY(:,:,L)
+            INGRID => ARRAY8
+            CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &           INGRID, OUTGRID, IS_MASS=0, NetCDF=.TRUE. )
+            E_NOX(:,:,2,L) = OUTGRID
+            NULLIFY( INGRID )
+         ENDDO
+
+         ! Read summer NOx (JJA)
+         CALL READ_BPCH2( FILENAME, 'ANTHSRCE', 1,  
+     &                    3624d0,    144,     91,     
+     &                    2,         ARRAY,     QUIET=.TRUE. )
+
+         DO L = 1, 2
+            ARRAY8(:,:) = ARRAY(:,:,L)
+            INGRID => ARRAY8
+            CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &           INGRID, OUTGRID, IS_MASS=0, NetCDF=.TRUE. )
+            E_NOX(:,:,3,L) = OUTGRID
+            NULLIFY( INGRID )
+         ENDDO
+
+         ! Read autumn NOx (SON)
+         CALL READ_BPCH2( FILENAME, 'ANTHSRCE', 1,  
+     &                    5832d0,    144,     91,     
+     &                    2,         ARRAY,     QUIET=.TRUE. )
+
+         DO L = 1, 2
+            ARRAY8(:,:) = ARRAY(:,:,L)
+            INGRID => ARRAY8
+            CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &           INGRID, OUTGRID, IS_MASS=0, NetCDF=.TRUE. )
+            E_NOX(:,:,4,L) = OUTGRID
+            NULLIFY( INGRID )
+         ENDDO
+      ENDIF
+        
+      !=================================================================
+      ! Read CO (tracer #4): aseasonal
+      !=================================================================
+      IF ( PRESENT( E_CO ) ) THEN
+         CALL READ_BPCH2( FILENAME, 'ANTHSRCE',    4,  
+     &                    0d0,       144,        91,     
+     &                    1,         ARRAY(:,:,1), QUIET=.TRUE. )
+
+         ARRAY8(:,:) = ARRAY(:,:,1)
+         INGRID => ARRAY8
+         CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &        INGRID, OUTGRID, IS_MASS=0, NetCDF=.TRUE. )
+         E_CO(:,:) = OUTGRID
+         NULLIFY( INGRID )
+      ENDIF
+
+      !=================================================================
+      ! Read ALK4 (tracer #5): aseasonal
+      !=================================================================
+      IF ( PRESENT( E_ALK4 ) ) THEN
+         CALL READ_BPCH2( FILENAME, 'ANTHSRCE',    5,  
+     &                    0d0,       144,        91,     
+     &                    1,         ARRAY(:,:,1), QUIET=.TRUE. )
+
+         ARRAY8(:,:) = ARRAY(:,:,1)
+         INGRID => ARRAY8
+         CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &        INGRID, OUTGRID, IS_MASS=0, NetCDF=.TRUE. )
+         E_ALK4(:,:) = OUTGRID
+         NULLIFY( INGRID )
+      ENDIF
+ 
+      !=================================================================
+      ! Read ACET (tracer #9): aseasonal
+      !=================================================================
+      IF ( PRESENT( E_ACET ) ) THEN
+         CALL READ_BPCH2( FILENAME, 'ANTHSRCE',    9,  
+     &                    0d0,       144,        91,     
+     &                    1,         ARRAY(:,:,1), QUIET=.TRUE. )
+
+         ARRAY8(:,:) = ARRAY(:,:,1)
+         INGRID => ARRAY8
+         CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &        INGRID, OUTGRID, IS_MASS=0, NetCDF=.TRUE. )
+         E_ACET(:,:) = OUTGRID
+         NULLIFY( INGRID )
+      ENDIF
+
+      !=================================================================
+      ! Read MEK (tracer #10): aseasonal
+      !=================================================================
+      IF ( PRESENT( E_MEK ) ) THEN
+         CALL READ_BPCH2( FILENAME, 'ANTHSRCE',    10, 
+     &                    0d0,       144,        91,     
+     &                    1,         ARRAY(:,:,1), QUIET=.TRUE. )
+
+         ARRAY8(:,:) = ARRAY(:,:,1)
+         INGRID => ARRAY8
+         CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &        INGRID, OUTGRID, IS_MASS=0, NetCDF=.TRUE. )
+         E_MEK(:,:) = OUTGRID
+         NULLIFY( INGRID )
+      ENDIF
+
+      !=================================================================
+      ! Read PRPE (tracer #18): aseasonal
+      !=================================================================
+      IF ( PRESENT( E_PRPE ) ) THEN
+         CALL READ_BPCH2( FILENAME, 'ANTHSRCE',    18, 
+     &                    0d0,       144,        91,     
+     &                    1,         ARRAY(:,:,1), QUIET=.TRUE. )
+
+         ARRAY8(:,:) = ARRAY(:,:,1)
+         INGRID => ARRAY8
+         CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &        INGRID, OUTGRID, IS_MASS=0, NetCDF=.TRUE. )
+         E_PRPE(:,:) = OUTGRID
+         NULLIFY( INGRID )
+      ENDIF
+
+      !=================================================================
+      ! Read C3H8 (tracer #19): aseasonal
+      !=================================================================
+      IF ( PRESENT( E_C3H8 ) ) THEN
+         CALL READ_BPCH2( FILENAME, 'ANTHSRCE',    19, 
+     &                    0d0,       144,        91,     
+     &                    1,         ARRAY(:,:,1), QUIET=.TRUE. )
+
+         ARRAY8(:,:) = ARRAY(:,:,1)
+         INGRID => ARRAY8
+         CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &        INGRID, OUTGRID, IS_MASS=0, NetCDF=.TRUE. )
+         E_C3H8(:,:) = OUTGRID
+         NULLIFY( INGRID )
+      ENDIF
+
+      !=================================================================
+      ! Read C2H6 (tracer #20): aseasonal
+      !=================================================================
+      IF ( PRESENT( E_C2H6 ) ) THEN
+         CALL READ_BPCH2( FILENAME, 'ANTHSRCE',    21, 
+     &                    0d0,       144,        91,     
+     &                    1,         ARRAY(:,:,1), QUIET=.TRUE. )
+
+         ARRAY8(:,:) = ARRAY(:,:,1)
+         INGRID => ARRAY8
+         CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &        INGRID, OUTGRID, IS_MASS=0, NetCDF=.TRUE. )
+         E_C2H6(:,:) = OUTGRID
+         NULLIFY( INGRID )
+      ENDIF
+
+      !=================================================================
+      ! Read ETHE (tracer #26): aseasonal
+      !=================================================================
+      IF ( PRESENT( E_ETHE ) ) THEN
+         CALL READ_BPCH2( FILENAME, 'ANTHSRCE',    26, 
+     &                    0d0,       144,        91,     
+     &                    1,         ARRAY(:,:,1), QUIET=.TRUE. )
+
+         ARRAY8(:,:) = ARRAY(:,:,1)
+         INGRID => ARRAY8
+         CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &        INGRID, OUTGRID, IS_MASS=0, NetCDF=.TRUE. )
+         E_ETHE(:,:) = OUTGRID
+         NULLIFY( INGRID )
+      ENDIF
+
+      !=================================================================
+      ! Read SOx (tracer #27): 4 seasons, 2 levels
+      !=================================================================
+      IF ( PRESENT( E_SOX ) ) THEN 
+
+         ! Read winter SOx (DJF)
+         CALL READ_BPCH2( FILENAME, 'ANTHSRCE', 27, 
+     &                    -744d0,    144,     91,     
+     &                    2,         ARRAY,     QUIET=.TRUE. )
+
+         DO L = 1, 2
+            ARRAY8(:,:) = ARRAY(:,:,L)
+            INGRID => ARRAY8
+            CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &           INGRID, OUTGRID, IS_MASS=0, NetCDF=.TRUE. )
+            E_SOX(:,:,1,L) = OUTGRID
+            NULLIFY( INGRID )
+         ENDDO
+
+         ! Read spring SOx (MAM)
+         CALL READ_BPCH2( FILENAME, 'ANTHSRCE', 27, 
+     &                    1416d0,    144,     91,     
+     &                    2,         ARRAY,     QUIET=.TRUE. )
+
+         DO L = 1, 2
+            ARRAY8(:,:) = ARRAY(:,:,L)
+            INGRID => ARRAY8
+            CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &           INGRID, OUTGRID, IS_MASS=0, NetCDF=.TRUE. )
+            E_SOX(:,:,2,L) = OUTGRID
+            NULLIFY( INGRID )
+         ENDDO
+
+         ! Read summer SOx (JJA)
+         CALL READ_BPCH2( FILENAME, 'ANTHSRCE', 27, 
+     &                    3624d0,    144,     91,     
+     &                    2,         ARRAY,     QUIET=.TRUE. )
+
+         DO L = 1, 2
+            ARRAY8(:,:) = ARRAY(:,:,L)
+            INGRID => ARRAY8
+            CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &           INGRID, OUTGRID, IS_MASS=0, NetCDF=.TRUE. )
+            E_SOX(:,:,3,L) = OUTGRID
+            NULLIFY( INGRID )
+         ENDDO
+
+         ! Read autumn SOx (SON)
+         CALL READ_BPCH2( FILENAME, 'ANTHSRCE', 27, 
+     &                    5832d0,    144,     91,     
+     &                    2,         ARRAY,     QUIET=.TRUE. )
+
+         DO L = 1, 2
+            ARRAY8(:,:) = ARRAY(:,:,L)
+            INGRID => ARRAY8
+            CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &           INGRID, OUTGRID, IS_MASS=0, NetCDF=.TRUE. )
+            E_SOX(:,:,4,L) = OUTGRID
+            NULLIFY( INGRID )
+         ENDDO
+      ENDIF
+
+#else
 
       !=================================================================
       ! Read NOx (tracer #1): 4 seasons, 2 levels
@@ -813,6 +1098,8 @@
          ENDDO
       ENDIF
 
+#endif
+
       ! Return to calling program
       END SUBROUTINE READ_GEIA
 
@@ -843,7 +1130,8 @@
 !
       ! References to F90 modules
       USE BPCH2_MOD
-      USE DIRECTORY_MOD, ONLY : DATA_DIR
+      USE DIRECTORY_MOD, ONLY : DATA_DIR, DATA_DIR_1x1
+      USE REGRID_A2A_MOD
 
       USE CMN_SIZE_MOD            ! Size parameters
 
@@ -856,18 +1144,64 @@
       REAL*4                        :: ARRAY(IIPAR,JJPAR,1) 
       CHARACTER(LEN=255)            :: FILENAME
 
+      CHARACTER(LEN=255)            :: LLFILENAME
+      REAL*4                        :: GENERIC_2x25(144,91)
+      REAL*8                        :: GENERIC_8_2x25(144,91)
+      REAL*8                        :: ARRAYOUT(IIPAR,JJPAR)
+
       !=================================================================
       ! READ_GEIA begins here!
       !=================================================================
 
       ! Define the binary punch file name
+#if defined( MODELE )
+      FILENAME = TRIM( DATA_DIR_1x1 )                     //
+     &           'C3H8_C2H6_200109/C3H8_C2H6_ngas.geos.2x25'
+#else
       FILENAME = TRIM( DATA_DIR )                         //
      &           'C3H8_C2H6_200109/C3H8_C2H6_ngas.'       // 
      &           GET_NAME_EXT_2D() // '.' // GET_RES_EXT() 
+#endif
       
       ! Echo filename to std output
       WRITE( 6, 110 ) TRIM( FILENAME )
  110  FORMAT( 'READ_C3H8_C2H6_NGAS: Reading ', a )
+
+#if defined( MODELE )
+      
+      ! Read C3H8 (tracer #19): aseasonal
+      IF ( PRESENT( E_C3H8 ) ) THEN
+         
+         CALL READ_BPCH2( FILENAME, 'ANTHSRCE', 19, 
+     &        0d0, 144, 91, 1, GENERIC_2x25, QUIET=.TRUE. )
+         
+         LLFILENAME = TRIM( DATA_DIR_1x1) //
+     &        'MAP_A2A_Regrid_201203/MAP_A2A_latlon_geos2x25.nc'
+         
+         GENERIC_8_2x25 = GENERIC_2x25
+         CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &        GENERIC_8_2x25, ARRAYOUT, IS_MASS=0, NetCDF=.TRUE. )
+         E_C3H8 = ARRAYOUT
+
+      ENDIF
+
+      ! Read C2H6 (tracer #21): aseasonal
+      IF ( PRESENT( E_C2H6 ) ) THEN
+         
+         CALL READ_BPCH2( FILENAME, 'ANTHSRCE', 21, 
+     &        0d0, 144, 91, 1, GENERIC_2x25, QUIET=.TRUE. )
+         
+         LLFILENAME = TRIM( DATA_DIR_1x1) //
+     &        'MAP_A2A_Regrid_201203/MAP_A2A_latlon_geos2x25.nc'
+         
+         GENERIC_8_2x25 = GENERIC_2x25
+         CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &        GENERIC_8_2x25, ARRAYOUT, IS_MASS=0, NetCDF=.TRUE. )
+         E_C2H6 = ARRAYOUT
+         
+      ENDIF
+
+#else
 
       ! Read C3H8 (tracer #19): aseasonal
       IF ( PRESENT( E_C3H8 ) ) THEN
@@ -886,6 +1220,8 @@
 
          E_C2H6(:,:) = ARRAY(:,:,1)
       ENDIF
+
+#endif
 
       ! Return to calling program
       END SUBROUTINE READ_C3H8_C2H6_NGAS

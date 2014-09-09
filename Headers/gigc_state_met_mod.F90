@@ -57,6 +57,9 @@ MODULE GIGC_State_Met_Mod
      REAL*8,  POINTER :: GWETTOP   (:,:  )  ! Top soil moisture [1]
      REAL*8,  POINTER :: HFLUX     (:,:  )  ! Sensible heat flux [W/m2]
      REAL*8,  POINTER :: LAI       (:,:  )  ! Leaf area index [m2/m2]
+#if defined( ICECAP ) 
+     REAL*8,  POINTER :: LGM_ICE   (:,:  )  ! LGM Ice Fraction
+#endif
      REAL*8,  POINTER :: LWI       (:,:  )  ! Land/water indices [1]
      REAL*8,  POINTER :: LWI_GISS  (:,:  )  ! Land fraction [1]
      REAL*8,  POINTER :: MOLENGTH  (:,:  )  ! Monin-Obhukov length [m]
@@ -72,6 +75,8 @@ MODULE GIGC_State_Met_Mod
      REAL*8,  POINTER :: PRECSNO   (:,:  )  ! Snow precip [kg/m2/s]
      REAL*8,  POINTER :: PS1       (:,:  )  ! Sfc press at timestep start[hPa]
      REAL*8,  POINTER :: PS2       (:,:  )  ! Sfc press at timestep end [hPa]
+     REAL*8,  POINTER :: PSC1      (:,:  )  ! Interpolated sfc pressure [hPa]
+     REAL*8,  POINTER :: PSCM      (:,:  )  ! Interpolated sfc pressure [hPa]
      REAL*8,  POINTER :: PSC2      (:,:  )  ! Interpolated sfc pressure [hPa]
      REAL*8,  POINTER :: RADLWG    (:,:  )  ! Net LW radiation @ ground [W/m2]
      REAL*8,  POINTER :: RADSWG    (:,:  )  ! Solar radiation @ ground [W/m2]
@@ -99,6 +104,7 @@ MODULE GIGC_State_Met_Mod
      REAL*8,  POINTER :: TO31      (:,:  )  ! Total O3 at timestep start [DU]
      REAL*8,  POINTER :: TO32      (:,:  )  ! Total O3 at timestep end [DU]
      REAL*8,  POINTER :: TROPP     (:,:  )  ! Tropopause pressure [hPa]
+     INTEGER, POINTER :: TROPL     (:,:  )  ! Tropopause level [level]
      REAL*8,  POINTER :: TROPP1    (:,:  )  ! Trop P at timestep start [hPa]
      REAL*8,  POINTER :: TROPP2    (:,:  )  ! Trop P at timestep end [hPa]
      REAL*8,  POINTER :: TS        (:,:  )  ! Surface temperature [K]
@@ -121,6 +127,11 @@ MODULE GIGC_State_Met_Mod
      REAL*8,  POINTER :: BXHEIGHT  (:,:,:)  ! Grid box height [m]
      REAL*8,  POINTER :: CLDF      (:,:,:)  ! 3-D cloud fraction [1]
      REAL*8,  POINTER :: CMFMC     (:,:,:)  ! Cloud mass flux [kg/m2/s]
+     REAL*8,  POINTER :: C_ED1     (:,:,:)  ! Entrainment by DD1 [Pa/s]
+     REAL*8,  POINTER :: C_ED2     (:,:,:)  ! Entrainment by DD2 [Pa/s]
+     REAL*8,  POINTER :: C_EU1     (:,:,:)  ! Entrainment by UD1 [Pa/s]
+     REAL*8,  POINTER :: C_OD1     (:,:,:)  ! Outflow by DD1 [Pa/s]
+     REAL*8,  POINTER :: C_OD2     (:,:,:)  ! Outflow by DD2 [Pa/s]
      REAL*8,  POINTER :: DELP      (:,:,:)  ! Delta-P extent  of a grid box [mb]
      REAL*8,  POINTER :: DETRAINE  (:,:,:)  ! Detrainment (entrain plume)[Pa/s]
      REAL*8,  POINTER :: DETRAINN  (:,:,:)  ! Detrainment (non-entr plume)[Pa/s]
@@ -144,7 +155,10 @@ MODULE GIGC_State_Met_Mod
      REAL*8,  POINTER :: PFILSAN   (:,:,:)  ! Dwn flux ice prec:LS+anv [kg/m2/s]
      REAL*8,  POINTER :: PFLCU     (:,:,:)  ! Dwn flux liq prec:conv [kg/m2/s]
      REAL*8,  POINTER :: PFLLSAN   (:,:,:)  ! Dwn flux ice prec:LS+anv [kg/m2/s]
+#if !defined( QUS )
+     ! See if others will change PV to ZETA (after Greek symbol for pot vort)
      REAL*8,  POINTER :: PV        (:,:,:)  ! Potential vort [kg*m2/kg/s]
+#endif
      REAL*8,  POINTER :: QI        (:,:,:)  ! Ice mixing ratio [kg/kg]
      REAL*8,  POINTER :: QL        (:,:,:)  ! Water mixing ratio [kg/kg]
      REAL*8,  POINTER :: REEVAPCN  (:,:,:)  ! Evap of precip conv [kg/kg/s]
@@ -167,6 +181,11 @@ MODULE GIGC_State_Met_Mod
      REAL*8,  POINTER :: ZMEU      (:,:,:)  ! Z/M updraft entrainment [Pa/s]
      REAL*8,  POINTER :: ZMMD      (:,:,:)  ! Z/M downdraft mass flux [Pa/s]
      REAL*8,  POINTER :: ZMMU      (:,:,:)  ! Z/M updraft   mass flux [Pa/s]
+#if defined( GISS ) && defined( QUS )
+     REAL*8,  POINTER :: PU        (:,:,:)  ! E/W air mass flux [mb.m2/s]
+     REAL*8,  POINTER :: PV        (:,:,:)  ! N/S air mass flux [mb.m2/s]
+     REAL*8,  POINTER :: CONV      (:,:,:)  ! U/D mass fluxes [mb.m2/s]
+#endif
 
      !----------------------------------------------------------------------
      ! Land type and leaf area index (LAI) fields for dry deposition
@@ -358,6 +377,14 @@ CONTAINS
     IF ( RC /= GIGC_SUCCESS ) RETURN
     State_Met%PS2      = 0d0
 
+    ALLOCATE( State_Met%PSC1      ( IM, JM ), STAT=RC )
+    IF ( RC /= GIGC_SUCCESS ) RETURN
+    State_Met%PSC1     = 0d0
+
+    ALLOCATE( State_Met%PSCM      ( IM, JM ), STAT=RC )
+    IF ( RC /= GIGC_SUCCESS ) RETURN
+    State_Met%PSCM     = 0d0
+
     ALLOCATE( State_Met%PSC2      ( IM, JM ), STAT=RC )
     IF ( RC /= GIGC_SUCCESS ) RETURN
     State_Met%PSC2     = 0d0
@@ -406,6 +433,10 @@ CONTAINS
     IF ( RC /= GIGC_SUCCESS ) RETURN
     State_Met%TROPP    = 0d0
 
+    ALLOCATE( State_Met%TROPL     ( IM, JM ), STAT=RC )
+    IF ( RC /= GIGC_SUCCESS ) RETURN
+    State_Met%TROPL    = 0d0
+
     ALLOCATE( State_Met%TS        ( IM, JM ), STAT=RC )
     IF ( RC /= GIGC_SUCCESS ) RETURN
     State_Met%TS       = 0d0
@@ -434,10 +465,10 @@ CONTAINS
     IF ( RC /= GIGC_SUCCESS ) RETURN
     State_Met%Z0       = 0d0
 
-#if defined( GCAP )
+#if defined( GISS ) || defined( GCAP )
 
     !=======================================================================
-    ! GCAP met fields
+    ! GISS met fields
     !=======================================================================
     ALLOCATE( State_Met%LWI_GISS  ( IM, JM ), STAT=RC )
     IF ( RC /= GIGC_SUCCESS ) RETURN
@@ -466,6 +497,12 @@ CONTAINS
     ALLOCATE( State_Met%TROPP2    ( IM, JM ), STAT=RC )
     IF ( RC /= GIGC_SUCCESS ) RETURN
     State_Met%TROPP2   = 0d0
+
+#if defined( ICECAP )
+    ALLOCATE( State_Met%LGM_ICE   ( IM, JM ), STAT=RC )
+    IF ( RC /= GIGC_SUCCESS ) RETURN
+    State_Met%LGM_ICE  = 0d0
+#endif
 
 #elif defined( GEOS_4 )
 
@@ -647,9 +684,13 @@ CONTAINS
     IF ( RC /= GIGC_SUCCESS ) RETURN           
     State_Met%PMID     = 0d0
 
+#if !defined( QUS )
+
     ALLOCATE( State_Met%PV        ( IM, JM, LM   ), STAT=RC )
     IF ( RC /= GIGC_SUCCESS ) RETURN
     State_Met%PV       = 0d0
+
+#endif
 
     ALLOCATE( State_Met%QI        ( IM, JM, LM   ), STAT=RC )
     IF ( RC /= GIGC_SUCCESS ) RETURN           
@@ -687,10 +728,10 @@ CONTAINS
     IF ( RC /= GIGC_SUCCESS ) RETURN
     State_Met%V        = 0d0
 
-#if defined( GCAP )
+#if defined( GISS ) || defined( GCAP )
 
     !=======================================================================
-    ! GCAP met fields
+    ! GISS met fields
     !=======================================================================
     ALLOCATE( State_Met%DETRAINE  ( IM, JM, LM   ), STAT=RC )
     IF ( RC /= GIGC_SUCCESS ) RETURN
@@ -719,6 +760,47 @@ CONTAINS
     ALLOCATE( State_Met%UPDN      ( IM, JM, LM   ), STAT=RC )
     IF ( RC /= GIGC_SUCCESS ) RETURN
     State_Met%UPDN     = 0d0
+
+#if defined( MODELE )
+
+    ALLOCATE( State_Met%C_ED1     ( IM, JM, LM   ), STAT=RC )
+    IF ( RC /= GIGC_SUCCESS ) RETURN           
+    State_Met%C_ED1    = 0d0
+
+    ALLOCATE( State_Met%C_ED2     ( IM, JM, LM   ), STAT=RC )
+    IF ( RC /= GIGC_SUCCESS ) RETURN           
+    State_Met%C_ED2    = 0d0
+
+    ALLOCATE( State_Met%C_EU1     ( IM, JM, LM   ), STAT=RC )
+    IF ( RC /= GIGC_SUCCESS ) RETURN           
+    State_Met%C_EU1    = 0d0
+
+    ALLOCATE( State_Met%C_OD1     ( IM, JM, LM   ), STAT=RC )
+    IF ( RC /= GIGC_SUCCESS ) RETURN           
+    State_Met%C_OD1    = 0d0
+
+    ALLOCATE( State_Met%C_OD2     ( IM, JM, LM   ), STAT=RC )
+    IF ( RC /= GIGC_SUCCESS ) RETURN           
+    State_Met%C_OD2    = 0d0
+
+#endif
+
+#if defined( QUS )
+
+    ALLOCATE( State_Met%PU        ( IM, JM, LM   ), STAT=RC )
+    IF ( RC /= GIGC_SUCCESS ) RETURN           
+    State_Met%PU      = 0d0
+
+    ALLOCATE( State_Met%PV        ( IM, JM, LM   ), STAT=RC )
+    IF ( RC /= GIGC_SUCCESS ) RETURN           
+    State_Met%PV      = 0d0
+
+    ALLOCATE( State_Met%CONV      ( IM, JM, LM   ), STAT=RC )
+    IF ( RC /= GIGC_SUCCESS ) RETURN           
+    State_Met%CONV    = 0d0
+
+#endif
+
 
 #elif defined( GEOS_4 )
 
@@ -921,6 +1003,7 @@ CONTAINS
     IF ( ASSOCIATED( State_Met%SUNCOS     )) DEALLOCATE( State_Met%SUNCOS     )
     IF ( ASSOCIATED( State_Met%SUNCOSmid  )) DEALLOCATE( State_Met%SUNCOSmid  )
     IF ( ASSOCIATED( State_Met%SUNCOSmid5 )) DEALLOCATE( State_Met%SUNCOSmid5 )
+    IF ( ASSOCIATED( State_Met%TROPL      )) DEALLOCATE( State_Met%TROPL      )
     IF ( ASSOCIATED( State_Met%TROPP      )) DEALLOCATE( State_Met%TROPP      )
     IF ( ASSOCIATED( State_Met%TS         )) DEALLOCATE( State_Met%TS         )
     IF ( ASSOCIATED( State_Met%TSKIN      )) DEALLOCATE( State_Met%TSKIN      )
@@ -963,9 +1046,10 @@ CONTAINS
     IF ( ASSOCIATED( State_Met%U          )) DEALLOCATE( State_Met%U          )
     IF ( ASSOCIATED( State_Met%V          )) DEALLOCATE( State_Met%V          )
 
-#if defined( GCAP )
+#if defined( GISS ) || defined( GCAP )
+
     !========================================================================
-    ! Fields specific to the GCAP met data product
+    ! Fields specific to the GISS met data product
     !========================================================================
 
     ! 2-D fields
@@ -985,6 +1069,25 @@ CONTAINS
     IF ( ASSOCIATED( State_Met%ENTRAIN    )) DEALLOCATE( State_Met%ENTRAIN    )
     IF ( ASSOCIATED( State_Met%UPDE       )) DEALLOCATE( State_Met%UPDE       )
     IF ( ASSOCIATED( State_Met%UPDN       )) DEALLOCATE( State_Met%UPDN       )
+
+#if defined( MODELE )
+    ! Extra convection fields for ModelE
+    IF ( ASSOCIATED( State_Met%C_ED1      )) DEALLOCATE( State_Met%C_ED1      )
+    IF ( ASSOCIATED( State_Met%C_ED2      )) DEALLOCATE( State_Met%C_ED2      )
+    IF ( ASSOCIATED( State_Met%C_EU1      )) DEALLOCATE( State_Met%C_EU1      )
+    IF ( ASSOCIATED( State_Met%C_OD1      )) DEALLOCATE( State_Met%C_OD1      )
+    IF ( ASSOCIATED( State_Met%C_OD2      )) DEALLOCATE( State_Met%C_OD2      )
+#endif
+
+#if defined( QUS )
+    IF ( ASSOCIATED( State_Met%PU         )) DEALLOCATE( State_Met%PU         )
+    IF ( ASSOCIATED( State_Met%PV         )) DEALLOCATE( State_Met%PV         )
+    IF ( ASSOCIATED( State_Met%CONV       )) DEALLOCATE( State_Met%CONV       )
+#endif
+
+#if defined( ICECAP )
+    IF ( ASSOCIATED( State_Met%LGM_ICE    )) DEALLOCATE( State_Met%LGM_ICE    )
+#endif
 
 #elif defined( GEOS_4 )
     !========================================================================

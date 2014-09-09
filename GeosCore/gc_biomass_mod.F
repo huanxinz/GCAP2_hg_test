@@ -164,6 +164,8 @@
 !******************************************************************************
 !
       USE inquireMod, ONLY : findFreeLUN
+      USE REGRID_A2A_MOD
+      USE DIRECTORY_MOD, ONLY : DATA_DIR_1x1
 
       IMPLICIT NONE
 
@@ -208,7 +210,7 @@
 
 !------------------------------------------------------------------------------
 
-      SUBROUTINE GC_COMPUTE_BIOMASS( YEAR, MONTH, BIOMASS )
+      SUBROUTINE GC_COMPUTE_BIOMASS( YEAR, MONTH, BIOMASS, State_Met )
 !
 !******************************************************************************
 !  Subroutine GC_COMPUTE_BIOMASS computes the biomass burning emissions for 
@@ -293,12 +295,14 @@
       USE LOGICAL_MOD,   ONLY : LBBSEA,          LTOMSAI
       USE LOGICAL_MOD,   ONLY : LFUTURE
       USE TIME_MOD,      ONLY : ITS_A_LEAPYEAR,  GET_TAU
+      USE GIGC_State_Met_Mod, ONLY : MetState
 
       USE CMN_SIZE_MOD      ! Size parameters
 
       ! Arguments 
-      INTEGER, INTENT(IN)    :: YEAR, MONTH
-      REAL*8,  INTENT(OUT)   :: BIOMASS(IIPAR,JJPAR,NBIOMAX)
+      INTEGER, INTENT(IN)        :: YEAR, MONTH
+      REAL*8,  INTENT(OUT)       :: BIOMASS(IIPAR,JJPAR,NBIOMAX)
+      TYPE(MetState), INTENT(IN) :: State_Met ! Meteorology State object
 
       ! Local variables
       LOGICAL, SAVE          :: FIRST = .TRUE.
@@ -402,13 +406,19 @@
             ! Get TAU0 value to index the punch file -- use generic year 1985
             XTAU = GET_TAU0( MONTH, 1, 1985 )
 
+#if defined( MODELE )
+            ! Filename for seasonal biomass burning emissions
+            FILENAME = TRIM( DATA_DIR_1x1 ) // TRIM( BIOMASS_DIR ) // 
+     &                 'bioburn.seasonal.geos.2x25'
+#else
             ! Filename for seasonal biomass burning emissions
             FILENAME = TRIM( DATA_DIR )    // TRIM( BIOMASS_DIR ) // 
      &                 'bioburn.seasonal.' // GET_NAME_EXT_2D()   //
      &                 '.'                 // GET_RES_EXT()
+#endif
 
             ! Read the seasonal biomass burning emissions from disk
-            CALL READ_BIOMASS( FILENAME, XTAU, BIOMASS )
+            CALL READ_BIOMASS( State_Met, FILENAME, XTAU, BIOMASS )
 
          !==============================================================
          ! Case 2: LBBSEA = T and LTOMSAI = T
@@ -424,13 +434,19 @@
             ! Get TAU0 value to index the punch file -- use generic year 1985
             XTAU = GET_TAU0( MONTH, 1, 1985 )            
 
+#if defined( MODELE )
+            ! Filename for seasonal biomass burning emissions
+            FILENAME = TRIM( DATA_DIR_1x1 ) // TRIM( BIOMASS_DIR ) // 
+     &                 'bioburn.seasonal.geos.2x25'
+#else
             ! Filename for seasonal biomass burning emissions
             FILENAME = TRIM( DATA_DIR )    // TRIM( BIOMASS_DIR ) //
      &                 'bioburn.seasonal.' // GET_NAME_EXT_2D()   //
      &                 '.'                 // GET_RES_EXT()
+#endif
 
             ! Read the seasonal biomass burning emissions into BIOMASS_SEA
-            CALL READ_BIOMASS( FILENAME, XTAU, BIOMASS_SEA )
+            CALL READ_BIOMASS( State_Met, FILENAME, XTAU, BIOMASS_SEA )
 
             ! Get TAU0 value to index the punch file -- use generic year 1985
             XTAU = GET_TAU0( 1, 1, 1985 )
@@ -441,7 +457,7 @@
      &                 '.'               // GET_RES_EXT()
 
             ! Read the annual biomass burning emissions into BIOMASS_ANN
-            CALL READ_BIOMASS( FILENAME, XTAU, BIOMASS_ANN )
+            CALL READ_BIOMASS( State_Met, FILENAME, XTAU, BIOMASS_ANN )
 
             ! Adjust the annual biomass burning to the TOMS Aerosol 
             ! Index data where necessary.  Otherwise, overwrite
@@ -468,25 +484,39 @@
                ! use generic year 1985
                XTAU = GET_TAU0( MONTH, 1, 1985 )
 
+#if defined( MODELE )
+            ! Filename for seasonal biomass burning emissions
+            FILENAME = TRIM( DATA_DIR_1x1 ) // TRIM( BIOMASS_DIR ) // 
+     &                    'bioburn.seasonal.geos.2x25'
+#else
                ! Filename for seasonal biomass burning emissions
                FILENAME = TRIM( DATA_DIR )    // TRIM( BIOMASS_DIR ) //
      &                    'bioburn.seasonal.' // GET_NAME_EXT_2D()   //
      &                    '.'                 // GET_RES_EXT() 
+#endif
 
                ! Read the seasonal biomass burning emissions into BIOMASS_SEA
-               CALL READ_BIOMASS( FILENAME, XTAU, BIOMASS_SEA )
+               CALL READ_BIOMASS( State_Met, 
+     &                            FILENAME, XTAU, BIOMASS_SEA )
 
                ! Get TAU0 value to index the punch file -- 
                ! use generic year 1985
                XTAU = GET_TAU0( 1, 1, 1985 )
 
+#if defined( MODELE )
+               ! Filename for seasonal biomass burning emissions
+               FILENAME = TRIM( DATA_DIR_1x1 ) // TRIM( BIOMASS_DIR ) //
+     &                    'bioburn.annual.geos.2x25'
+#else
                ! Filename for annual biomass burning emissions
                FILENAME = TRIM( DATA_DIR )  // TRIM( BIOMASS_DIR ) //
      &                    'bioburn.annual.' // GET_NAME_EXT_2D()   //
      &                    '.'               // GET_RES_EXT()
+#endif
 
                ! Read the annual biomass burning emissions from disk
-               CALL READ_BIOMASS( FILENAME, XTAU, BIOMASS_ANN )
+               CALL READ_BIOMASS( State_Met, 
+     &                            FILENAME, XTAU, BIOMASS_ANN )
 
                ! Adjust the annual biomass burning to the TOMS Aerosol 
                ! Index data where necessary.  Otherwise, overwrite
@@ -499,15 +529,21 @@
                ! Use actual TAU0 value to index punch file
                XTAU = GET_TAU()
 
+#if defined( MODELE )
+               ! Filename for seasonal biomass burning emissions
+               FILENAME = TRIM( DATA_DIR_1x1 ) // TRIM( BIOMASS_DIR )
+     &              // 'bioburn.interannual.geos.2x25.' // CYEAR
+#else
                ! Filename for interannual variability biomass burning emissions
                FILENAME = TRIM( DATA_DIR )       // 
      &                    TRIM( BIOMASS_DIR )    //
      &                    'bioburn.interannual.' // GET_NAME_EXT_2D() // 
      &                    '.'                    // GET_RES_EXT()     // 
      &                    '.'                    // CYEAR           
+#endif
 
                ! Read interannual variability biomass burning
-               CALL READ_BIOMASS( FILENAME, XTAU, BIOMASS )
+               CALL READ_BIOMASS( State_Met, FILENAME, XTAU, BIOMASS )
             
          ENDIF
 
@@ -522,15 +558,21 @@
             ! TAU0 value for 0 GMT on the first day of this month & year
             XTAU = GET_TAU0( MONTH, 1, YEAR )
 
+#if defined( MODELE )
+            ! Filename for seasonal biomass burning emissions
+            FILENAME = TRIM( DATA_DIR_1x1 ) // TRIM( BIOMASS_DIR )//
+     &                  'bioburn.interannual.geos.2x25.' // CYEAR
+#else
             ! Filename for interannual variability biomass burning emissions
             FILENAME = TRIM( DATA_DIR )       // 
      &                 TRIM( BIOMASS_DIR )    //      
      &                 'bioburn.interannual.' // GET_NAME_EXT_2D() // 
      &                 '.'                    // GET_RES_EXT()     // 
      &                 '.'                    // CYEAR
+#endif
                
             ! Read interannual variability biomass burning
-            CALL READ_BIOMASS( FILENAME, XTAU, BIOMASS )
+            CALL READ_BIOMASS( State_Met, FILENAME, XTAU, BIOMASS )
 
          ENDIF
 
@@ -547,7 +589,7 @@
 
 !------------------------------------------------------------------------------
 
-      SUBROUTINE READ_BIOMASS( FILENAME, TAU0, BIOMASS )
+      SUBROUTINE READ_BIOMASS( State_Met, FILENAME, TAU0, BIOMASS )
 !
 !******************************************************************************
 !  Subroutine READ_BIOMASS reads the biomass burning emissions from disk
@@ -601,6 +643,7 @@
 !
       ! References to F90 modules
       USE BPCH2_MOD,            ONLY : READ_BPCH2
+      USE GIGC_State_Met_Mod,   ONLY : MetState
       USE LOGICAL_MOD,          ONLY : LFUTURE
       USE TRANSFER_MOD,         ONLY : TRANSFER_2D
       ! Add IDBs of all species handled here (hotp 8/3/09)
@@ -610,13 +653,15 @@
       USE TRACERID_MOD, ONLY : IDBGLYX, IDBMGLY, IDBBENZ, IDBTOLU
       USE TRACERID_MOD, ONLY : IDBXYLE, IDBC2H4, IDBC2H2, IDBGLYC
       USE TRACERID_MOD, ONLY : IDBHAC
-     
+      USE TIME_MOD,      ONLY : GET_YEAR
+      USE DIRECTORY_MOD, ONLY : DATA_DIR_1x1
       USE CMN_SIZE_MOD             ! Size parameters
 
       ! Arguments
       CHARACTER(LEN=*), INTENT(IN)  :: FILENAME
       REAL*8,           INTENT(IN)  :: TAU0
       REAL*8,           INTENT(OUT) :: BIOMASS(IIPAR,JJPAR,NBIOMAX)
+      TYPE(MetState),   INTENT(IN)  :: State_Met ! Meteorology State object
 
       ! Local variables
       REAL*4                        :: ARRAY(IIPAR,JJPAR,1)
@@ -625,7 +670,29 @@
       ! of the 9 new species (tmf, 12/18/06) 
       REAL*8   :: COEMIS(IIPAR, JJPAR)  ! CO emissions before scaling
       REAL*8   :: TRCEMIS(IIPAR, JJPAR) ! Tracer emissions scaled from CO
+      REAL*8   :: SCALE
+      INTEGER  :: THISYEAR
 
+      REAL*4             :: GENERIC_2x25(144,91)
+      REAL*8, TARGET     :: GENERIC_8_2x25(144,91)
+      CHARACTER(LEN=255) :: LLFILENAME 
+      REAL*8, POINTER    :: INGRID   (:,:) => NULL()
+
+      LLFILENAME = TRIM(DATA_DIR_1x1)//
+     &     "MAP_A2A_Regrid_201203/MAP_A2A_latlon_geos2x25.nc"
+
+#if defined( ICECAP )
+      THISYEAR = GET_YEAR()
+      SELECT CASE ( THISYEAR )
+      CASE( 2100:2399 )
+         SCALE = 1d-1
+      CASE DEFAULT
+         SCALE = 1d0
+      END SELECT
+#else
+      SCALE = 1d0
+#endif
+      
       !=================================================================
       ! READ_BIOMASS begins here!
       !=================================================================
@@ -648,6 +715,28 @@
             ! NOx
             !----------
 
+#if defined( MODELE )
+            
+            CALL READ_BPCH2( FILENAME, 'BIOBSRCE', 1, 
+     &           TAU0, 144, 91, 1, GENERIC_2x25, QUIET=.TRUE. )
+            
+            ! Cast from REAL*4 to REAL*8
+            GENERIC_8_2x25 = GENERIC_2x25
+
+            ! Regrid to current model resolution
+            INGRID => GENERIC_8_2x25
+            CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &           GENERIC_8_2x25, BIOMASS(:,:,IDBNO), 
+     &           IS_MASS=0, NetCDF=.TRUE. )
+
+            BIOMASS(:,:,IDBNO) = BIOMASS(:,:,IDBNO) * 
+     &                          ( 1d0 - State_Met%SNICE(:,:) ) * SCALE
+
+            ! Free pointer
+            NULLIFY( INGRID )
+
+#else
+
             ! NOx is stored in the biomass file as tracer #1
             CALL READ_BPCH2( FILENAME, 'BIOBSRCE', 1, 
      &                       TAU0,      IIPAR,     JJPAR,     
@@ -655,6 +744,8 @@
 
             ! Cast from REAL*4 to REAL*8 and resize to (IIPAR,JJPAR)
             CALL TRANSFER_2D( ARRAY(:,:,1), BIOMASS(:,:,IDBNO) )
+
+#endif
 
             ! Compute future NOx emissions (if necessary)
             IF ( LFUTURE ) THEN
@@ -672,6 +763,28 @@
             ! CO
             !----------
 
+#if defined( MODELE )
+            
+            CALL READ_BPCH2( FILENAME, 'BIOBSRCE', 4, 
+     &           TAU0, 144, 91, 1, GENERIC_2x25, QUIET=.TRUE. )
+            
+            ! Cast from REAL*4 to REAL*8
+            GENERIC_8_2x25 = GENERIC_2x25
+
+            ! Regrid to current model resolution
+            INGRID => GENERIC_8_2x25
+            CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &           GENERIC_8_2x25, BIOMASS(:,:,IDBCO), 
+     &           IS_MASS=0, NetCDF=.TRUE. )
+
+            BIOMASS(:,:,IDBCO) = BIOMASS(:,:,IDBCO) * 
+     &                          ( 1d0 - State_Met%SNICE(:,:) ) * SCALE
+            COEMIS = BIOMASS(:,:,IDBCO)
+
+            ! Free pointer
+            NULLIFY( INGRID )
+
+#else
             ! CO is stored in the biomass file as tracer #4
             CALL READ_BPCH2( FILENAME, 'BIOBSRCE', 4, 
      &                       TAU0,      IIPAR,     JJPAR,     
@@ -683,6 +796,8 @@
             ! Store CO emissions before scaling 
             ! for new gaseous emissions (tmf, 1/7/09)
             CALL TRANSFER_2D( ARRAY(:,:,1), COEMIS(:,:) )
+
+#endif
 
             ! Compute future CO emissions (if necessary)
             IF ( LFUTURE ) THEN
@@ -700,6 +815,27 @@
             ! ALK4
             !----------
 
+#if defined( MODELE )
+            
+            CALL READ_BPCH2( FILENAME, 'BIOBSRCE', 5, 
+     &           TAU0, 144, 91, 1, GENERIC_2x25, QUIET=.TRUE. )
+            
+            ! Cast from REAL*4 to REAL*8
+            GENERIC_8_2x25 = GENERIC_2x25
+
+            ! Regrid to current model resolution
+            INGRID => GENERIC_8_2x25
+            CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &           GENERIC_8_2x25, BIOMASS(:,:,IDBALK4), 
+     &           IS_MASS=0, NetCDF=.TRUE. )
+
+            BIOMASS(:,:,IDBALK4) = BIOMASS(:,:,IDBALK4) * 
+     &                          ( 1d0 - State_Met%SNICE(:,:) ) * SCALE
+
+            ! Free pointer
+            NULLIFY( INGRID )
+
+#else
             ! ALK4 is stored in the biomass file as tracer #5
             CALL READ_BPCH2( FILENAME, 'BIOBSRCE', 5, 
      &                       TAU0,      IIPAR,     JJPAR,     
@@ -707,6 +843,8 @@
 
             ! Cast from REAL*4 to REAL*8 and resize to (IIPAR,JJPAR)
             CALL TRANSFER_2D( ARRAY(:,:,1), BIOMASS(:,:,IDBALK4) )
+
+#endif
 
             ! Compute future ALK4 emissions (if necessary)
             IF ( LFUTURE ) THEN
@@ -724,6 +862,28 @@
             ! ACET
             !----------
 
+#if defined( MODELE )
+            
+            CALL READ_BPCH2( FILENAME, 'BIOBSRCE', 9, 
+     &           TAU0, 144, 91, 1, GENERIC_2x25, QUIET=.TRUE. )
+            
+            ! Cast from REAL*4 to REAL*8
+            GENERIC_8_2x25 = GENERIC_2x25
+
+            ! Regrid to current model resolution
+            INGRID => GENERIC_8_2x25
+            CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &           GENERIC_8_2x25, BIOMASS(:,:,IDBACET), 
+     &           IS_MASS=0, NetCDF=.TRUE. )
+
+            BIOMASS(:,:,IDBACET) = BIOMASS(:,:,IDBACET) * 
+     &                          ( 1d0 - State_Met%SNICE(:,:) ) * SCALE
+
+            ! Free pointer
+            NULLIFY( INGRID )
+
+#else
+
             ! ACET is stored in the biomass file as tracer #9
             CALL READ_BPCH2( FILENAME, 'BIOBSRCE', 9, 
      &                       TAU0,      IIPAR,     JJPAR,     
@@ -731,6 +891,8 @@
 
             ! Cast from REAL*4 to REAL*8 and resize to (IIPAR,JJPAR)
             CALL TRANSFER_2D( ARRAY(:,:,1), BIOMASS(:,:,IDBACET) )
+
+#endif
 
             ! ACET -- Convert from [molec/cm2/month] to [molec C/cm2/month] 
             BIOMASS(:,:,IDBACET) = BIOMASS(:,:,IDBACET) * 3d0  
@@ -754,6 +916,28 @@
             ! MEK
             !----------
 
+#if defined( MODELE )
+            
+            CALL READ_BPCH2( FILENAME, 'BIOBSRCE', 10, 
+     &           TAU0, 144, 91, 1, GENERIC_2x25, QUIET=.TRUE. )
+            
+            ! Cast from REAL*4 to REAL*8
+            GENERIC_8_2x25 = GENERIC_2x25
+
+            ! Regrid to current model resolution
+            INGRID => GENERIC_8_2x25
+            CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &           GENERIC_8_2x25, BIOMASS(:,:,IDBMEK), 
+     &           IS_MASS=0, NetCDF=.TRUE. )
+
+            BIOMASS(:,:,IDBMEK) = BIOMASS(:,:,IDBMEK) * 
+     &                          ( 1d0 - State_Met%SNICE(:,:) ) * SCALE
+
+            ! Free pointer
+            NULLIFY( INGRID )
+
+#else
+
             ! MEK is stored in the biomass file as tracer #10
             CALL READ_BPCH2( FILENAME, 'BIOBSRCE', 10, 
      &                       TAU0,      IIPAR,     JJPAR,      
@@ -761,6 +945,8 @@
 
             ! Cast from REAL*4 to REAL*8 and resize to (IIPAR,JJPAR)
             CALL TRANSFER_2D( ARRAY(:,:,1), BIOMASS(:,:,IDBMEK) )
+
+#endif
 
             ! Compute future MEK emissions (if necessary)
             IF ( LFUTURE ) THEN
@@ -778,6 +964,28 @@
             ! ALD2
             !----------
 
+#if defined( MODELE )
+            
+            CALL READ_BPCH2( FILENAME, 'BIOBSRCE', 11, 
+     &           TAU0, 144, 91, 1, GENERIC_2x25, QUIET=.TRUE. )
+            
+            ! Cast from REAL*4 to REAL*8
+            GENERIC_8_2x25 = GENERIC_2x25
+
+            ! Regrid to current model resolution
+            INGRID => GENERIC_8_2x25
+            CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &           GENERIC_8_2x25, BIOMASS(:,:,IDBALD2), 
+     &           IS_MASS=0, NetCDF=.TRUE. )
+
+            BIOMASS(:,:,IDBALD2) = BIOMASS(:,:,IDBALD2) * 
+     &                          ( 1d0 - State_Met%SNICE(:,:) ) * SCALE
+
+            ! Free pointer
+            NULLIFY( INGRID )
+
+#else
+
             ! ALD2 is stored in the biomass file as tracer #11
             CALL READ_BPCH2( FILENAME, 'BIOBSRCE', 11, 
      &                       TAU0,      IIPAR,     JJPAR,      
@@ -785,6 +993,8 @@
 
             ! Cast from REAL*4 to REAL*8 and resize to (IIPAR,JJPAR)
             CALL TRANSFER_2D( ARRAY(:,:,1), BIOMASS(:,:,IDBALD2) )
+
+#endif
 
             ! Compute future ALD2 emissions (if necessary)
             IF ( LFUTURE ) THEN
@@ -802,6 +1012,28 @@
             ! PRPE
             !----------
 
+#if defined( MODELE )
+            
+            CALL READ_BPCH2( FILENAME, 'BIOBSRCE', 18, 
+     &           TAU0, 144, 91, 1, GENERIC_2x25, QUIET=.TRUE. )
+            
+            ! Cast from REAL*4 to REAL*8
+            GENERIC_8_2x25 = GENERIC_2x25
+
+            ! Regrid to current model resolution
+            INGRID => GENERIC_8_2x25
+            CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &           GENERIC_8_2x25, BIOMASS(:,:,IDBPRPE), 
+     &           IS_MASS=0, NetCDF=.TRUE. )
+
+            BIOMASS(:,:,IDBPRPE) = BIOMASS(:,:,IDBPRPE) * 
+     &                          ( 1d0 - State_Met%SNICE(:,:) ) * SCALE
+
+            ! Free pointer
+            NULLIFY( INGRID )
+
+#else
+
             ! PRPE is stored in the biomass file as tracer #18
             CALL READ_BPCH2( FILENAME, 'BIOBSRCE', 18, 
      &                       TAU0,      IIPAR,     JJPAR,      
@@ -809,6 +1041,8 @@
 
             ! Cast from REAL*4 to REAL*8 and resize to (IIPAR,JJPAR)
             CALL TRANSFER_2D( ARRAY(:,:,1), BIOMASS(:,:,IDBPRPE) )
+
+#endif
 
             ! Compute future PRPE emissions (if necessary)
             IF ( LFUTURE ) THEN
@@ -827,6 +1061,28 @@
             ! C3H8
             !----------
 
+#if defined( MODELE )
+            
+            CALL READ_BPCH2( FILENAME, 'BIOBSRCE', 19, 
+     &           TAU0, 144, 91, 1, GENERIC_2x25, QUIET=.TRUE. )
+            
+            ! Cast from REAL*4 to REAL*8
+            GENERIC_8_2x25 = GENERIC_2x25
+
+            ! Regrid to current model resolution
+            INGRID => GENERIC_8_2x25
+            CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &           GENERIC_8_2x25, BIOMASS(:,:,IDBC3H8), 
+     &           IS_MASS=0, NetCDF=.TRUE. )
+
+            BIOMASS(:,:,IDBC3H8) = BIOMASS(:,:,IDBC3H8) * 
+     &                          ( 1d0 - State_Met%SNICE(:,:) ) * SCALE
+
+            ! Free pointer
+            NULLIFY( INGRID )
+
+#else
+
             ! C3H8 is stored in the biomass file as tracer #19
             CALL READ_BPCH2( FILENAME, 'BIOBSRCE', 19, 
      &                       TAU0,      IIPAR,     JJPAR,      
@@ -834,6 +1090,8 @@
 
             ! Cast from REAL*4 to REAL*8 and resize to (IIPAR,JJPAR)
             CALL TRANSFER_2D( ARRAY(:,:,1), BIOMASS(:,:,IDBC3H8) )
+
+#endif
 
             ! C3H8 -- convert from [molec/cm2/month] to [molec C/cm2/month] 
             BIOMASS(:,:,IDBC3H8) = BIOMASS(:,:,IDBC3H8) * 3d0 
@@ -854,6 +1112,28 @@
             ! CH2O
             !----------
 
+#if defined( MODELE )
+            
+            CALL READ_BPCH2( FILENAME, 'BIOBSRCE', 20, 
+     &           TAU0, 144, 91, 1, GENERIC_2x25, QUIET=.TRUE. )
+            
+            ! Cast from REAL*4 to REAL*8
+            GENERIC_8_2x25 = GENERIC_2x25
+
+            ! Regrid to current model resolution
+            INGRID => GENERIC_8_2x25
+            CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &           GENERIC_8_2x25, BIOMASS(:,:,IDBCH2O), 
+     &           IS_MASS=0, NetCDF=.TRUE. )
+
+            BIOMASS(:,:,IDBCH2O) = BIOMASS(:,:,IDBCH2O) * 
+     &                          ( 1d0 - State_Met%SNICE(:,:) ) * SCALE
+
+            ! Free pointer
+            NULLIFY( INGRID )
+
+#else
+
             ! CH2O is stored in the biomass file as tracer #20
             CALL READ_BPCH2( FILENAME, 'BIOBSRCE', 20, 
      &                       TAU0,      IIPAR,     JJPAR,      
@@ -861,6 +1141,8 @@
 
             ! Cast from REAL*4 to REAL*8 and resize to (IIPAR,JJPAR)
             CALL TRANSFER_2D( ARRAY(:,:,1), BIOMASS(:,:,IDBCH2O) )
+
+#endif
 
             ! Compute future CH2O emissions (if necessary)
             IF ( LFUTURE ) THEN
@@ -878,6 +1160,28 @@
             ! C2H6
             !----------
 
+#if defined( MODELE )
+            
+            CALL READ_BPCH2( FILENAME, 'BIOBSRCE', 21, 
+     &           TAU0, 144, 91, 1, GENERIC_2x25, QUIET=.TRUE. )
+            
+            ! Cast from REAL*4 to REAL*8
+            GENERIC_8_2x25 = GENERIC_2x25
+
+            ! Regrid to current model resolution
+            INGRID => GENERIC_8_2x25
+            CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &           GENERIC_8_2x25, BIOMASS(:,:,IDBC2H6), 
+     &           IS_MASS=0, NetCDF=.TRUE. )
+
+            BIOMASS(:,:,IDBC2H6) = BIOMASS(:,:,IDBC2H6) * 
+     &                          ( 1d0 - State_Met%SNICE(:,:) ) * SCALE
+
+            ! Free pointer
+            NULLIFY( INGRID )
+
+#else
+
             ! C2H6 is stored in the biomass file as tracer #21
             CALL READ_BPCH2( FILENAME, 'BIOBSRCE', 21, 
      &                       TAU0,      IIPAR,     JJPAR,      
@@ -885,6 +1189,8 @@
 
             ! Cast from REAL*4 to REAL*8 and resize to (IIPAR,JJPAR)
             CALL TRANSFER_2D( ARRAY(:,:,1), BIOMASS(:,:,IDBC2H6) )
+
+#endif
 
             ! C2H6 --convert from [molec/cm2/month] to [molec C/cm2/month]
             BIOMASS(:,:,IDBC2H6) = BIOMASS(:,:,IDBC2H6) * 2d0 
@@ -1277,7 +1583,8 @@
 !------------------------------------------------------------------------------
 
       SUBROUTINE GC_READ_BIOMASS_BCOC( YEAR,       MONTH,
-     &                                 BIOMASS_BC, BIOMASS_OC )
+     &                                 BIOMASS_BC, BIOMASS_OC, 
+     &                                 State_Met                  )
 !
 !******************************************************************************
 !  Subroutine GC_READ_BIOMASS_BC_OC reads the GEOS-Chem default biomass 
@@ -1307,8 +1614,9 @@
       USE FUTURE_EMISSIONS_MOD, ONLY : GET_FUTURE_SCALE_BCbb
       USE FUTURE_EMISSIONS_MOD, ONLY : GET_FUTURE_SCALE_OCbb
       USE GRID_MOD,             ONLY : GET_AREA_CM2
+      USE GIGC_State_Met_Mod,   ONLY : MetState
       USE LOGICAL_MOD,          ONLY : LBBSEA,          LFUTURE
-      USE TIME_MOD,             ONLY : ITS_A_LEAPYEAR 
+      USE TIME_MOD,             ONLY : ITS_A_LEAPYEAR,  GET_YEAR 
       USE TRACER_MOD,           ONLY : XNUMOL
       USE TRACERID_MOD,         ONLY : IDTBCPO,         IDTOCPO
       ! SOAupdate (hotp 6/12/09)
@@ -1319,20 +1627,37 @@
       USE CMN_SIZE_MOD             ! Size parameters
 
       ! Arguments
-      INTEGER                       :: YEAR, MONTH
+      INTEGER, INTENT(IN)           :: YEAR, MONTH
       REAL*8                        :: BIOMASS_BC(IIPAR,JJPAR)
       REAL*8                        :: BIOMASS_OC(IIPAR,JJPAR)
+      TYPE(MetState), INTENT(IN)    :: State_Met ! Meteorology State object
 
       ! Local variables
-      INTEGER                       :: I,       J
+      INTEGER                       :: I,       J,      THISYEAR
       REAL*4                        :: ARRAY(IIPAR,JJPAR,1)
       REAL*8                        :: CONV,    XTAU,   SEC_PER_MONTH
+      REAL*8                        :: SCALE
       CHARACTER(LEN=4)              :: CYEAR
       CHARACTER(LEN=255)            :: BC_FILE, OC_FILE
 
+      REAL*4                        :: GENERIC_2x25( 144, 91 )
+      REAL*8                        :: GENERIC_8_2x25( 144, 91 )
+      CHARACTER(LEN=255)            :: LLFILENAME 
+
       ! Days per month (based on 1998)
-      REAL*8 :: NDAYS(12) = (/ 31d0, 28d0, 31d0, 30d0, 31d0, 30d0, 
-     &                         31d0, 31d0, 30d0, 31d0, 30d0, 31d0 /)
+      REAL*8 :: NDAYS(12) 
+
+#if defined( ICECAP )
+      THISYEAR = GET_YEAR()
+      SELECT CASE ( THISYEAR )
+      CASE( 2100:2399 )
+         SCALE = 1d-1
+      CASE DEFAULT
+         SCALE = 1d0
+      END SELECT
+#else
+      SCALE = 1d0
+#endif
 
       !=================================================================
       ! GC_READ_BIOMASS_BC_OC begins here!
@@ -1345,6 +1670,10 @@
          BIOMASS_OC = 0d0
          RETURN
       ENDIF
+
+      NDAYS = (/ 31d0, 28d0, 31d0, 30d0, 31d0, 30d0, 
+     &           31d0, 31d0, 30d0, 31d0, 30d0, 31d0 /)
+
 
       ! Test for leap year
       IF ( MONTH == 2 ) THEN
@@ -1372,6 +1701,18 @@
          ! Use seasonal biomass emissions
          !------------------------------------
 
+#if defined( MODELE )
+
+         ! File name for seasonal BCPO biomass emissions
+         BC_FILE = TRIM( DATA_DIR_1x1 )                      //
+     &             'biomass_200110/BCPO.bioburn.seasonal.geos.2x25'
+
+         ! File name for seasonal OCPO biomass emissions
+         OC_FILE = TRIM( DATA_DIR_1x1 )                     //
+     &             'biomass_200110/OCPO.bioburn.seasonal.geos.2x25'
+
+#else
+
          ! File name for seasonal BCPO biomass emissions
          BC_FILE = TRIM( DATA_DIR )                          //
      &             'biomass_200110/BCPO.bioburn.seasonal.'   //
@@ -1382,6 +1723,8 @@
      &             'biomass_200110/OCPO.bioburn.seasonal.'  //
      &             GET_NAME_EXT_2D() // '.' // GET_RES_EXT()
 
+#endif
+
          ! Get TAU0 value (use generic year 1985)
          XTAU = GET_TAU0( MONTH, 1, 1985 )      
 
@@ -1391,6 +1734,18 @@
          ! Use interannual biomass emissions 
          ! for years between 1996 and 2002
          !------------------------------------
+
+#if defined( MODELE )
+
+         ! File name for seasonal BCPO biomass emissions
+         BC_FILE = TRIM( DATA_DIR_1x1 ) //
+     &        'biomass_200110/BCPO.bioburn.seasonal.geos.2x25' // CYEAR
+
+         ! File name for seasonal OCPO biomass emissions
+         OC_FILE = TRIM( DATA_DIR_1x1 )                     //
+     &        'biomass_200110/OCPO.bioburn.seasonal.geos.2x25' // CYEAR
+
+#else
 
          ! File name for interannual BCPO biomass burning emissions`
          BC_FILE = TRIM( DATA_DIR )                           //
@@ -1403,6 +1758,8 @@
      &             'biomass_200110/OCPO.bioburn.interannual.' // 
      &             GET_NAME_EXT_2D() // '.'                   //
      &             GET_RES_EXT()     // '.'                   // CYEAR
+
+#endif
 
          ! Use TAU0 value on the 1st of this month to index bpch file
          XTAU = GET_TAU0( MONTH, 1, YEAR )
@@ -1417,6 +1774,23 @@
       WRITE( 6, 100 ) TRIM( BC_FILE )
  100  FORMAT( '     - GC_READ_BIOMASS_BC_OC: Reading ', a )
 
+
+#if defined( MODELE )
+            
+            CALL READ_BPCH2( BC_FILE, 'BIOBSRCE', 34, 
+     &           XTAU, 144, 91, 1, GENERIC_2x25, QUIET=.TRUE. )
+            
+            LLFILENAME = TRIM(DATA_DIR_1x1)//
+     &           "MAP_A2A_Regrid_201203/MAP_A2A_latlon_geos2x25.nc"
+            
+            GENERIC_8_2x25 = GENERIC_2x25
+            CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &           GENERIC_8_2x25, BIOMASS_BC, IS_MASS=1, NetCDF=.TRUE. )
+            
+            BIOMASS_BC = BIOMASS_BC * ( 1d0 - State_Met%SNICE ) * SCALE
+
+#else
+
       ! Read BC emission data [kg/mon]
       CALL READ_BPCH2( BC_FILE, 'BIOBSRCE', 34, 
      &                 XTAU,     IIPAR,     JJPAR,     
@@ -1425,12 +1799,30 @@
       ! Cast to REAL*8 and resize
       CALL TRANSFER_2D ( ARRAY(:,:,1), BIOMASS_BC )
 
+#endif
+
       !------------------
       ! Read OC biomass
       !------------------
 
       ! Echo info
       WRITE( 6, 100 ) TRIM( OC_FILE )
+
+#if defined( GISS )
+            
+            CALL READ_BPCH2( OC_FILE, 'BIOBSRCE', 35, 
+     &           XTAU, 144, 91, 1, GENERIC_2x25, QUIET=.TRUE. )
+            
+            LLFILENAME = TRIM(DATA_DIR_1x1)//
+     &           "MAP_A2A_Regrid_201203/MAP_A2A_latlon_geos2x25.nc"
+            
+            GENERIC_8_2x25 = GENERIC_2x25
+            CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &           GENERIC_8_2x25, BIOMASS_OC, IS_MASS=1, NetCDF=.TRUE. )
+            
+            BIOMASS_OC = BIOMASS_OC * ( 1d0 - State_Met%SNICE ) * SCALE
+
+#else
 
       ! Read OC emission data [kg/mon]
       CALL READ_BPCH2( OC_FILE, 'BIOBSRCE', 35, 
@@ -1439,6 +1831,8 @@
 
       ! Cast to REAL*8 and resize
       CALL TRANSFER_2D ( ARRAY(:,:,1), BIOMASS_OC )
+
+#endif
 
       !=================================================================
       ! Convert from [kg C/mon] to [atoms C/cm2/s]
@@ -1488,7 +1882,8 @@
 
 !------------------------------------------------------------------------------
  
-      SUBROUTINE GC_READ_BIOMASS_SO2( YEAR, MONTH, BIOMASS_SO2 )
+      SUBROUTINE GC_READ_BIOMASS_SO2( YEAR, MONTH, BIOMASS_SO2,
+     &                                State_Met                 )
 !
 !******************************************************************************
 !  Subroutine GC_READ_BIOMASS_SO2 reads monthly mean biomass burning SO2
@@ -1514,9 +1909,10 @@
       USE BPCH2_MOD,            ONLY : GET_TAU0,        READ_BPCH2
       USE DIRECTORY_MOD,        ONLY : DATA_DIR
       USE FUTURE_EMISSIONS_MOD, ONLY : GET_FUTURE_SCALE_SO2bb
+      USE GIGC_State_Met_Mod,   ONLY : MetState
       USE GRID_MOD,             ONLY : GET_AREA_CM2
       USE LOGICAL_MOD,          ONLY : LBBSEA,          LFUTURE
-      USE TIME_MOD,             ONLY : ITS_A_LEAPYEAR
+      USE TIME_MOD,             ONLY : ITS_A_LEAPYEAR,  GET_YEAR
       USE TRACER_MOD,           ONLY : XNUMOL
       USE TRACERID_MOD,         ONLY : IDTSO2
       USE TRANSFER_MOD,         ONLY : TRANSFER_2D
@@ -1526,17 +1922,33 @@
       ! Arguments                   
       INTEGER, INTENT(IN)           :: YEAR, MONTH
       REAL*8,  INTENT(OUT)          :: BIOMASS_SO2(IIPAR,JJPAR)
+      TYPE(MetState), INTENT(IN)    :: State_Met ! Meteorology State object
                                     
       ! Local variables             
       INTEGER                       :: I, J, THISYEAR
       REAL*4                        :: ARRAY(IIPAR,JJPAR,1)
-      REAL*8                        :: CONV, XTAU, SEC_PER_MONTH
+      REAL*8                        :: CONV, XTAU, SEC_PER_MONTH, SCALE
       CHARACTER(LEN=4  )            :: CYEAR
       CHARACTER(LEN=255)            :: FILENAME
-                                    
+
+      REAL*4                        :: GENERIC_2x25( 144, 91 )
+      REAL*8                        :: GENERIC_8_2x25( 144, 91 )
+      CHARACTER(LEN=255)            :: LLFILENAME 
+                                          
       ! Days per month              
-      REAL*8 :: NDAYS(12) = (/ 31d0, 28d0, 31d0, 30d0, 31d0, 30d0, 
-     &                         31d0, 31d0, 30d0, 31d0, 30d0, 31d0 /)
+      REAL*8 :: NDAYS(12) 
+
+#if defined( ICECAP )
+      THISYEAR = GET_YEAR()
+      SELECT CASE ( THISYEAR )
+      CASE( 2100:2399 )
+         SCALE = 1d-1
+      CASE DEFAULT
+         SCALE = 1d0
+      END SELECT
+#else
+      SCALE = 1d0
+#endif
 
       !=================================================================
       ! GC_READ_BIOMASS_SO2 begins here!
@@ -1547,6 +1959,9 @@
          BIOMASS_SO2 = 0d0
          RETURN
       ENDIF
+
+      NDAYS = (/ 31d0, 28d0, 31d0, 30d0, 31d0, 30d0, 
+     &           31d0, 31d0, 30d0, 31d0, 30d0, 31d0 /)
 
       ! Test for leap year
       IF ( MONTH == 2 ) THEN
@@ -1574,10 +1989,20 @@
          ! Use seasonal biomass emissions
          !------------------------------------
 
+#if defined( GISS )
+
+         ! File name for seasonal BB emissions
+         FILENAME = TRIM( DATA_DIR )                         //
+     &              'biomass_200110/SO2.bioburn.seasonal.geos.2x25'
+
+#else
+
          ! File name for seasonal BB emissions
          FILENAME = TRIM( DATA_DIR )                         //
      &              'biomass_200110/SO2.bioburn.seasonal.'   //
      &              GET_NAME_EXT_2D() // '.' // GET_RES_EXT()
+
+#endif
 
          ! Get TAU0 value (use generic year 1985)
          XTAU = GET_TAU0( MONTH, 1, 1985 )      
@@ -1608,6 +2033,25 @@
       WRITE( 6, 100 ) TRIM( FILENAME )
  100  FORMAT( '     - GC_READ_BIOMASS_SO2: Reading ', a )
 
+
+#if defined( GISS )
+
+      ! Read SO2 emission data [kg/month] and regrid
+      CALL READ_BPCH2( FILENAME, 'BIOBSRCE',     26, 
+     &                 XTAU,      144,           91,     
+     &                 1,         GENERIC_2x25,  QUIET=.TRUE. )
+
+      LLFILENAME = TRIM(DATA_DIR_1x1)//
+     &     "MAP_A2A_Regrid_201203/MAP_A2A_latlon_geos2x25.nc"
+            
+      GENERIC_8_2x25 = GENERIC_2x25
+      CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &     GENERIC_8_2x25, BIOMASS_SO2, IS_MASS=1, NetCDF=.TRUE. )
+      
+      BIOMASS_SO2 = BIOMASS_SO2 * ( 1d0 - State_Met%SNICE ) !* SCALE
+
+#else
+
       ! Read SO2 emission data [kg/month]
       CALL READ_BPCH2( FILENAME, 'BIOBSRCE',     26, 
      &                 XTAU,      IIPAR,         JJPAR,     
@@ -1615,6 +2059,8 @@
 
       ! Cast to REAL*8 and resize
       CALL TRANSFER_2D ( ARRAY(:,:,1), BIOMASS_SO2 )
+
+#endif
 
       !=================================================================
       ! Convert units [kg SO2/month] -> [molec SO2/cm2/s]
@@ -1649,7 +2095,8 @@
 
 !------------------------------------------------------------------------------
 
-      SUBROUTINE GC_READ_BIOMASS_NH3( YEAR, MONTH, BIOMASS_NH3 ) 
+      SUBROUTINE GC_READ_BIOMASS_NH3( YEAR, MONTH, BIOMASS_NH3, 
+     &                                                      State_Met ) 
 !
 !******************************************************************************
 !  Subroutine GC_READ_BIOMASS_NH3 reads the monthly mean biomass NH3 
@@ -1678,27 +2125,45 @@
       USE FUTURE_EMISSIONS_MOD, ONLY : GET_FUTURE_SCALE_NH3bb
       USE LOGICAL_MOD,          ONLY : LBBSEA,          LFUTURE
       USE GRID_MOD,             ONLY : GET_AREA_CM2
-      USE TIME_MOD,             ONLY : ITS_A_LEAPYEAR
+      USE TIME_MOD,             ONLY : ITS_A_LEAPYEAR,  GET_YEAR
       USE TRACER_MOD,           ONLY : XNUMOL
       USE TRACERID_MOD,         ONLY : IDTNH3
       USE TRANSFER_MOD,         ONLY : TRANSFER_2D
 
-      USE CMN_SIZE_MOD             ! Size parameters
+      USE GIGC_State_Met_Mod,   ONLY : MetState
+
+      USE CMN_SIZE_MOD      ! Size parameters
 
       ! Arguments
       INTEGER, INTENT(IN)           :: YEAR, MONTH
       REAL*8,  INTENT(OUT)          :: BIOMASS_NH3(IIPAR,JJPAR)
+      TYPE(MetState), INTENT(IN)    :: State_Met ! Meteorology State object
 
       ! Local variables
-      INTEGER                       :: I, J
+      INTEGER                       :: I, J, THISYEAR
       REAL*4                        :: ARRAY(IIPAR,JJPAR,1)
-      REAL*8                        :: CONV, SEC_PER_MONTH, XTAU
+      REAL*8                        :: CONV, SEC_PER_MONTH, XTAU, SCALE
       CHARACTER(LEN=4  )            :: CYEAR
       CHARACTER(LEN=255)            :: FILENAME
 
+      REAL*4                        :: GENERIC_2x25( 144, 91 )
+      REAL*8                        :: GENERIC_8_2x25( 144, 91 )
+      CHARACTER(LEN=255)            :: LLFILENAME
+
       ! Number of days in the month
-      REAL*8 :: NDAYS(12) = (/ 31d0, 28d0, 31d0, 30d0, 31d0, 30d0, 
-     &                         31d0, 31d0, 30d0, 31d0, 30d0, 31d0 /)
+      REAL*8 :: NDAYS(12) 
+
+#if defined( ICECAP )
+      THISYEAR = GET_YEAR()
+      SELECT CASE ( THISYEAR )
+      CASE( 2100:2399 )
+         SCALE = 1d-1
+      CASE DEFAULT
+         SCALE = 1d0
+      END SELECT
+#else
+      SCALE = 1d0
+#endif
 
       !=================================================================
       ! READ_BIOMASS_NH3 begins here!
@@ -1709,6 +2174,9 @@
          BIOMASS_NH3 = 0d0
          RETURN
       ENDIF
+
+      NDAYS = (/ 31d0, 28d0, 31d0, 30d0, 31d0, 30d0, 
+     &                         31d0, 31d0, 30d0, 31d0, 30d0, 31d0 /)
 
       ! Test for leap year
       IF ( MONTH == 2 ) THEN
@@ -1736,10 +2204,16 @@
          ! Use seasonal biomass emissions
          !------------------------------------
 
+#if defined( GISS )
+        ! File name for seasonal BB emissions
+         FILENAME = TRIM( DATA_DIR )                         //
+     &              'biomass_200110/NH3.bioburn.seasonal.geos.2x25'
+#else
          ! File name for seasonal BB emissions
          FILENAME = TRIM( DATA_DIR )                         // 
      &              'biomass_200110/NH3.bioburn.seasonal.'   //
      &              GET_NAME_EXT_2D() // '.' // GET_RES_EXT()
+#endif
 
          ! Get TAU0 value (use generic year 1985)
          XTAU = GET_TAU0( MONTH, 1, 1985 )      
@@ -1770,6 +2244,24 @@
       WRITE( 6, 100 ) TRIM( FILENAME )
  100  FORMAT( '     - READ_BIOMASS_NH3: Reading ', a )
 
+#if defined( GISS )
+
+       ! Read NH3 emission data [kg/mon] as tracer 29
+       CALL READ_BPCH2( FILENAME, 'BIOBSRCE',     29,
+     &                 XTAU,      144,           91,
+     &                 1,         GENERIC_2x25,  QUIET=.TRUE. )
+
+      LLFILENAME = TRIM(DATA_DIR_1x1)//
+     &     "MAP_A2A_Regrid_201203/MAP_A2A_latlon_geos2x25.nc"
+
+      GENERIC_8_2x25 = GENERIC_2x25
+      CALL DO_REGRID_A2A( LLFILENAME, 144, 91,
+     &     GENERIC_8_2x25, BIOMASS_NH3, IS_MASS=1, NetCDF=.TRUE. )
+
+      BIOMASS_NH3 = BIOMASS_NH3 * ( 1d0 - State_Met%SNICE ) !* SCALE
+
+#else
+
       ! Read NH3 emission data [kg/mon] as tracer 29
       CALL READ_BPCH2( FILENAME, 'BIOBSRCE',    29, 
      &                 XTAU,      IIPAR,        JJPAR,      
@@ -1777,6 +2269,8 @@
 
       ! Cast from REAL*4 to REAL*8 and resize if necessary
       CALL TRANSFER_2D( ARRAY(:,:,1), BIOMASS_NH3 )
+
+#endif
 
       !=================================================================
       ! Compute IPCC future emissions (if necessary)
@@ -1833,7 +2327,7 @@
       USE BPCH2_MOD,     ONLY : GET_TAU0,        READ_BPCH2
       USE DIRECTORY_MOD, ONLY : DATA_DIR
       USE LOGICAL_MOD,   ONLY : LBBSEA
-      USE TIME_MOD,      ONLY : ITS_A_LEAPYEAR
+      USE TIME_MOD,      ONLY : ITS_A_LEAPYEAR,  GET_YEAR
       USE TRACER_MOD,    ONLY : ITS_A_CO2_SIM
       USE TRANSFER_MOD,  ONLY : TRANSFER_2D
 
@@ -1844,15 +2338,27 @@
       REAL*8,  INTENT(OUT)   :: BIOMASS_CO2(IIPAR,JJPAR)
 
       ! Local variables
-      INTEGER                :: I, J
+      INTEGER                :: I, J, THISYEAR
       REAL*4                 :: ARRAY(IIPAR,JJPAR,1)
-      REAL*8                 :: EMFACTCO2CO, TAU, SEC_PER_MONTH
+      REAL*8                 :: EMFACTCO2CO, TAU, SEC_PER_MONTH, SCALE
       CHARACTER(LEN=4)       :: SYEAR
       CHARACTER(LEN=255)     :: FILENAME
 
       ! Number of days in the month
-      REAL*8 :: NDAYS(12) = (/ 31d0, 28d0, 31d0, 30d0, 31d0, 30d0, 
-     &                         31d0, 31d0, 30d0, 31d0, 30d0, 31d0 /)
+      REAL*8 :: NDAYS(12) 
+
+#if defined( ICECAP )
+      THISYEAR = GET_YEAR()
+      SELECT CASE ( THISYEAR )
+      CASE( 2100:2399 )
+         SCALE = 1d-1
+      CASE DEFAULT
+         SCALE = 1d0
+      END SELECT
+#else
+      SCALE = 1d0
+#endif
+
 
       !=================================================================
       ! READ_BIOMASS_CO2 begins here!
@@ -1863,6 +2369,9 @@
          BIOMASS_CO2 = 0d0
          RETURN
       ENDIF
+
+      NDAYS = (/ 31d0, 28d0, 31d0, 30d0, 31d0, 30d0, 
+     &           31d0, 31d0, 30d0, 31d0, 30d0, 31d0 /)
 
       ! Test for leap year
       IF ( MONTH == 2 ) THEN

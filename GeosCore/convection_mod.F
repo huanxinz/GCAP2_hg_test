@@ -32,9 +32,10 @@
 !
       PRIVATE :: DO_GEOS4_CONVECT
       PRIVATE :: DO_GCAP_CONVECT
+      PRIVATE :: DO_GISS_CONVECT
       PRIVATE :: NFCLDMX
-      PRIVATE :: DO_MERRA_CONVECTION
 !
+      PRIVATE :: DO_MERRA_CONVECTION
 ! !REVISION HISTORY:
 !  27 Jan 2004 - R. Yantosca - Initial version
 !  (1 ) Contains new updates for GEOS-4/fvDAS convection.  Also now references
@@ -196,6 +197,19 @@
 
       ! Call GCAP driver routine
       CALL DO_GCAP_CONVECT
+     &   ( am_I_Root, Input_Opt, State_Met, State_Chm, RC )
+
+#elif defined( GISS )
+
+      !=================================================================
+      ! GISS ModelE or Model3 met fields
+      !=================================================================
+
+      ! Assume success
+      RC                =  GIGC_SUCCESS
+
+      ! Call GISS driver routine
+      CALL DO_GISS_CONVECT
      &   ( am_I_Root, Input_Opt, State_Met, State_Chm, RC )
 
 #elif defined( GEOS_4 )
@@ -478,7 +492,7 @@
 #endif
 
       ! For fields from Input_Opt
-      LOGICAL         :: LPRT
+      LOGICAL         :: LPRT, LWETD
       INTEGER         :: N_TRACERS
       REAL*8          :: TCVV(Input_Opt%N_TRACERS)
 
@@ -502,6 +516,7 @@
 
       ! Copy values from Input_Opt
       LPRT      = Input_Opt%LPRT
+      LWETD      = Input_Opt%LWETD
       N_TRACERS = Input_Opt%N_TRACERS
       TCVV      = Input_Opt%TCVV(1:N_TRACERS)
 
@@ -555,8 +570,13 @@
 
          ! Get fraction of tracer scavenged and the soluble tracer 
          ! index (ISOL). For non-soluble tracers, F=0 and ISOL=0.
-         CALL COMPUTE_F( N, p_FSOL, ISOL, State_Met, State_Chm ) 
-         
+         IF ( LWETD ) THEN
+            CALL COMPUTE_F( N, p_FSOL, ISOL, State_Met, State_Chm ) 
+         ELSE 
+            p_FSOL = 0d0
+            ISOL   = 0
+         ENDIF
+
          ! Free pointer memory
          NULLIFY( p_FSOL )
 
@@ -992,6 +1012,335 @@
       IF ( LPRT ) CALL DEBUG_MSG( '### DO_GCAP_CONV: a GCAP_CONVECT' )
 
       END SUBROUTINE DO_GCAP_CONVECT
+!EOC
+!------------------------------------------------------------------------------
+!                  GEOS-Chem Global Chemical Transport Model                  !
+!------------------------------------------------------------------------------
+!BOP
+!
+! !IROUTINE: do_giss_convect
+!
+! !DESCRIPTION: Subroutine DO\_GISS\_CONVECT is a wrapper for the GISS 
+!  convection code.  This was broken off from the old DO\_CONVECTION routine 
+!  above.
+!\\
+!\\
+! !INTERFACE:
+!
+      SUBROUTINE DO_GISS_CONVECT( am_I_Root, Input_Opt,
+     &                            State_Met, State_Chm, RC )
+!
+! !USES:
+!
+      USE CMN_DIAG_MOD
+      USE CMN_SIZE_MOD
+      USE DIAG_MOD,           ONLY : AD37
+      USE ERROR_MOD,          ONLY : DEBUG_MSG
+      USE GCAP_CONVECT_MOD,   ONLY : GCAP_CONVECT
+      USE GISS_CONVECT_MOD,   ONLY : GISSE_CONVECT, GISS3_CONVECT
+      USE GIGC_ErrCode_Mod
+      USE GIGC_Input_Opt_Mod, ONLY : OptInput
+      USE GIGC_State_Chm_Mod, ONLY : ChmState
+      USE GIGC_State_Met_Mod, ONLY : MetState
+      USE PRESSURE_MOD,       ONLY : GET_PEDGE, GET_PCENTER
+      USE TIME_MOD,           ONLY : GET_TS_CONV
+      USE WETSCAV_MOD,        ONLY : COMPUTE_F
+#if   defined( APM )
+      USE TRACER_MOD,         ONLY : N_APMTRA
+#endif
+!
+! !INPUT PARAMETERS:
+!
+      LOGICAL,        INTENT(IN)    :: am_I_Root   ! Are we on the root CPU?
+      TYPE(OptInput), INTENT(IN)    :: Input_Opt   ! Input Options object
+      TYPE(MetState), INTENT(IN)    :: State_Met   ! Meteorology State object
+!
+! !INPUT/OUTPUT PARAMETERS:
+!
+      TYPE(ChmState), INTENT(INOUT) :: State_Chm   ! Chemistry State object
+!
+! !OUTPUT PARAMETERS:
+!
+      INTEGER,        INTENT(OUT)   :: RC          ! Success or failure?
+!
+! !REVISION HISTORY: 
+!  25 May 2005 - S. Wu       - Initial version
+!  (1 ) Now use array masks to flip arrays vertically in call to GISS_CONVECT
+!        (bmy, 5/25/05)
+!  (2 ) Shut off scavenging in shallow convection for GISS below 700 hPa
+!        (swu, bmy, 11/1/05)
+!  (3 ) Add a check to set negative values in STT to TINY (ccc, 4/15/09)
+!  13 Aug 2010 - R. Yantosca - Added ProTeX headers
+!  15 Feb 2011 - R. Yantosca - Add modifications for APM from G. Luo
+!  09 Nov 2012 - M. Payer    - Replaced all met field arrays with State_Met
+!                              derived type object
+!  25 Mar 2013 - R. Yantosca - Now accept am_I_Root, Input_Opt, State_Chm, RC
+!EOP
+!------------------------------------------------------------------------------
+!BOC
+!
+! !LOCAL VARIABLES:
+!
+      LOGICAL, SAVE  :: FIRST = .TRUE.
+      INTEGER        :: I, ISOL, J, L, L2, N, NSTEP  
+      !INTEGER       :: INDEXSOL(N_TRACERS) 
+      INTEGER        :: CONVDT    
+      !REAL*8        :: F(IIPAR,JJPAR,LLPAR,N_TRACERS)
+      REAL*8         :: DP(IIPAR,JJPAR,LLPAR)
+      REAL*8         :: P1, P2, TDT   
+      REAL*8         :: GAINMASS
+      INTEGER        :: N_TOT_TRC      
+#if   defined( APM )
+      INTEGER        :: INDEXSOL(Input_Opt%N_TRACERS+N_APMTRA) 
+      REAL*8, TARGET :: F       (IIPAR,JJPAR,LLPAR,
+     &                          Input_Opt%N_TRACERS+N_APMTRA)
+#else
+      INTEGER        :: INDEXSOL(Input_Opt%N_TRACERS) 
+      REAL*8, TARGET :: F       (IIPAR,JJPAR,LLPAR,
+     &                          Input_Opt%N_TRACERS)
+#endif
+
+      ! For fields from Input_Opt
+      LOGICAL       :: LPRT, LWETD
+      INTEGER       :: N_TRACERS
+      REAL*8        :: TCVV(Input_Opt%N_TRACERS)
+
+      ! Pointers
+      REAL*8,  POINTER :: STT        (:,:,:,:)   ! Ptr to Tracer concentrations
+      REAL*8,  POINTER :: p_STT      (:,:,:,:)   ! Ptr to STT (flipped)
+      REAL*8,  POINTER :: p_F        (:,:,:,:)   ! Ptr to F   (flipped)
+
+      REAL*8,  POINTER :: p_UPDE     (:,:,:  )   ! Ptr to UPDE     met field (flipped)
+      REAL*8,  POINTER :: p_DNDE     (:,:,:  )   ! Ptr to DNDE     met field (flipped)
+      REAL*8,  POINTER :: p_ENTRAIN  (:,:,:  )   ! Ptr to ENTRAIN  met field (flipped)
+      REAL*8,  POINTER :: p_DETRAINE (:,:,:  )   ! Ptr to DETRAINE met field (flipped)
+      REAL*8,  POINTER :: p_C_ED2    (:,:,:  )   ! Ptr to C_ED2    met field (flipped)
+      REAL*8,  POINTER :: p_C_OD2    (:,:,:  )   ! Ptr to C_OD2    met field (flipped)
+      REAL*8,  POINTER :: p_UPDN     (:,:,:  )   ! Ptr to UPDN     met field (flipped)
+      REAL*8,  POINTER :: p_DNDN     (:,:,:  )   ! Ptr to DNDN     met field (flipped)
+      REAL*8,  POINTER :: p_C_EU1    (:,:,:  )   ! Ptr to C_EU1    met field (flipped)
+      REAL*8,  POINTER :: p_DETRAINN (:,:,:  )   ! Ptr to DETRAINN met field (flipped)
+      REAL*8,  POINTER :: p_C_ED1    (:,:,:  )   ! Ptr to C_ED1    met field (flipped)
+      REAL*8,  POINTER :: p_C_OD1    (:,:,:  )   ! Ptr to C_OD1    met field (flipped)
+
+      !=================================================================
+      ! DO_GISS_CONVECT begins here!
+      !=================================================================
+      
+      ! Assume success
+      RC        =  GIGC_SUCCESS
+
+      ! Copy values from Input_Opt
+      LPRT      = Input_Opt%LPRT
+      LWETD     = Input_Opt%LWETD
+      N_TRACERS = Input_Opt%N_TRACERS
+      TCVV      = Input_Opt%TCVV(1:N_TRACERS)
+
+      ! Pick the proper # of tracers for convection
+#if   defined( APM )
+      N_TOT_TRC = N_TRACERS + N_APMTRA   ! G-C tracers + APM tracers
+#else
+      N_TOT_TRC = N_TRACERS              ! G-C tracers only
+#endif
+
+
+
+      ! Test??
+      GAINMASS = 0d0
+
+      ! Convection timestep [s]
+      CONVDT = GET_TS_CONV() * 60d0 
+       
+      ! NSTEP is the # of internal convection timesteps.  According to
+      ! notes in the old convection code, 300s works well. (swu, 12/12/03)
+      NSTEP  = CONVDT / 300    
+      NSTEP  = MAX( NSTEP, 1 ) 
+
+      ! TIMESTEP*2; will be divided by 2 before passing to CONVTRAN 
+      TDT    = DBLE( CONVDT ) * 2.0D0 / DBLE( NSTEP )
+         
+      !### Debug
+      IF ( LPRT ) CALL DEBUG_MSG( '### DO_GISS_CONV: a INIT_FV' )
+
+      !=================================================================
+      ! Before calling convection, compute the fraction of insoluble
+      ! tracer (Finsoluble) lost in updrafts.  Finsoluble = 1-Fsoluble.
+      !=================================================================
+
+!$OMP PARALLEL DO
+!$OMP+DEFAULT( SHARED )
+!$OMP+PRIVATE( I, J, L, N, ISOL )
+!$OMP+SCHEDULE( DYNAMIC )
+      DO N = 1, N_TOT_TRC
+
+         ! Get fraction of tracer scavenged and the soluble tracer 
+         ! index (ISOL). For non-soluble tracers, F=0 and ISOL=0.
+         IF ( LWETD ) THEN
+            CALL COMPUTE_F( N, F(:,:,:,N), ISOL, State_Met, State_Chm ) 
+         ELSE
+            F(:,:,:,N) = 0d0
+            ISOL = 0
+         ENDIF
+
+         ! Store ISOL in an array for later use
+         INDEXSOL(N) = ISOL
+
+         ! Loop over grid boxes
+         DO L = 1, LLPAR
+         DO J = 1, JJPAR
+         DO I = 1, IIPAR
+
+            ! Shut off scavenging in shallow convection for GISS
+            ! (swu, bmy, 11/1/05)
+            IF ( GET_PCENTER( I, J, L ) > 700d0 ) F(I,J,L,N) = 0d0
+
+            ! ND37 diagnostic: store fraction of tracer 
+            ! lost in moist convective updrafts ("MC-FRC-$")
+            IF ( ND37 > 0 .and. ISOL > 0 .and. L <= LD37 ) THEN
+               AD37(I,J,L,ISOL) = AD37(I,J,L,ISOL) + F(I,J,L,N) 
+            ENDIF
+
+            ! GEOS-4 convection routines need the insoluble fraction
+            F(I,J,L,N) = 1d0 - F(I,J,L,N)
+         ENDDO
+         ENDDO
+         ENDDO
+      ENDDO
+!$OMP END PARALLEL DO
+       
+      !### Debug
+      IF ( LPRT ) CALL DEBUG_MSG( '### DO_GISS_CONV: a COMPUTE_F' )
+
+      !=================================================================
+      ! Compute pressure thickness arrays DP and RPDEL
+      ! These arrays are indexed from atm top --> surface
+      !=================================================================
+!$OMP PARALLEL DO
+!$OMP+DEFAULT( SHARED )
+!$OMP+PRIVATE( I, J, L, L2, P1, P2 )
+      DO L = 1, LLPAR
+
+         ! L2 runs from the atm top down to the surface
+         L2 = LLPAR - L + 1
+
+         ! Loop over surface grid boxes
+         DO J = 1, JJPAR
+         DO I = 1, IIPAR
+               
+            ! Pressure at bottom and top edges of grid box [hPa]
+            P1 = GET_PEDGE(I,J,L)
+            P2 = GET_PEDGE(I,J,L+1)
+
+            ! DP = Pressure difference between top & bottom edges [Pa]
+            DP(I,J,L2) = ( P1 - P2 ) * 100.0d0
+         ENDDO
+         ENDDO
+      ENDDO
+!$OMP END PARALLEL DO
+
+      !### Debug
+      IF ( LPRT ) CALL DEBUG_MSG( '### DO_GISS_CONV: a DP, RPDEL' )
+   
+      !=================================================================
+      ! Flip arrays in the vertical and call FVDAS_CONVECT
+      !=================================================================
+
+      ! Initialize GEOS-Chem tracer array [kg] from Chemistry State object
+      ! (mpayer, 12/6/12)
+      STT => State_Chm%Tracers
+
+      ! Point to met fields and flip in vertical
+      p_UPDE     => State_Met%UPDE     (:,:,LLPAR:1:-1)
+      p_DNDE     => State_Met%DNDE     (:,:,LLPAR:1:-1)
+      p_ENTRAIN  => State_Met%ENTRAIN  (:,:,LLPAR:1:-1)
+      p_DETRAINE => State_Met%DETRAINE (:,:,LLPAR:1:-1)
+      p_UPDN     => State_Met%UPDN     (:,:,LLPAR:1:-1)
+      p_DNDN     => State_Met%DNDN     (:,:,LLPAR:1:-1)
+      p_DETRAINN => State_Met%DETRAINN (:,:,LLPAR:1:-1)
+#if defined( MODELE )
+      p_C_ED2    => State_Met%C_ED2    (:,:,LLPAR:1:-1)
+      p_C_OD2    => State_Met%C_OD2    (:,:,LLPAR:1:-1)
+      p_C_EU1    => State_Met%C_EU1    (:,:,LLPAR:1:-1)
+      p_C_ED1    => State_Met%C_ED1    (:,:,LLPAR:1:-1)
+      p_C_OD1    => State_Met%C_OD1    (:,:,LLPAR:1:-1)
+#endif
+      p_STT      => State_Chm%Tracers  (:,:,LLPAR:1:-1,:)
+      p_F        => F                  (:,:,LLPAR:1:-1,:) 
+
+#if defined( MODEL3 )
+
+      ! Call the GISS ModeLE convection routines 
+      CALL GISS3_CONVECT( TDT, 
+     &                   p_STT,      
+     &                   N_TOT_TRC,
+     &                   DP, ! I think this is the correct way (bmy, 5/25/05)
+     &                   NSTEP, 
+     &                   p_F,        
+     &                   TCVV,   
+     &                   INDEXSOL, 
+     &                   p_UPDE,     
+     &                   p_DNDE,    
+     &                   p_ENTRAIN,  
+     &                   p_DETRAINE, 
+     &                   p_UPDN,     
+     &                   p_DNDN,     
+     &                   p_DETRAINN ) 
+
+#elif defined( MODELE )
+
+      ! Call the GCAP ModelE convection routines 
+      CALL GISSE_CONVECT( TDT, 
+     &                   p_STT,
+     &                   N_TRACERS,   
+     &                   DP,
+     &                   NSTEP, 
+     &                   p_F,
+     &                   TCVV,   
+     &                   INDEXSOL, 
+     &                   p_UPDE,    
+     &                   p_DNDE,    
+     &                   p_ENTRAIN, 
+     &                   p_DETRAINE,
+     &                   p_C_ED2,   
+     &                   p_C_OD2,   
+     &                   p_UPDN,    
+     &                   p_DNDN,    
+     &                   p_C_EU1,   
+     &                   p_DETRAINN,
+     &                   p_C_ED1, 
+     &                   p_C_OD1 )
+
+#endif
+
+      ! Add a check to set negative values in STT to TINY
+      ! (ccc, 4/15/09)
+!$OMP PARALLEL DO        
+!$OMP+DEFAULT( SHARED   )
+!$OMP+PRIVATE( N, L, J, I )
+      DO N = 1,N_TOT_TRC
+      DO L = 1,LLPAR
+      DO J = 1,JJPAR
+      DO I = 1,IIPAR
+         STT(I,J,L,N) = MAX(STT(I,J,L,N),TINY(1d0))
+      ENDDO
+      ENDDO
+      ENDDO
+      ENDDO
+!$OMP END PARALLEL DO
+
+      ! Free pointers
+      NULLIFY( STT )
+      NULLIFY( p_STT, p_F )
+      NULLIFY( p_UPDE, p_DNDE, p_ENTRAIN, p_DETRAINE, 
+     &         p_UPDN, p_DNDN, p_DETRAINN )
+#if defined( MODELE )
+      NULLIFY( p_C_ED2, p_C_OD2, p_C_EU1, p_C_ED1, p_C_OD1 )
+#endif
+
+      !### Debug! 
+      IF ( LPRT ) CALL DEBUG_MSG( '### DO_GISS_CONV: a GISS_CONVECT' )
+
+      END SUBROUTINE DO_GISS_CONVECT
 !EOC
 !------------------------------------------------------------------------------
 !                  GEOS-Chem Global Chemical Transport Model                  !

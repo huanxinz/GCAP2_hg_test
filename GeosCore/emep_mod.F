@@ -1806,7 +1806,7 @@
       !=================================================================
 
       ! Return if LEMEP is false
-      IF ( .not. Input_Opt%LEMEP ) RETURN
+      IF ( .not. ( Input_Opt%LEMEP .or. LEMEPSHIP ) ) RETURN
       
       !--------------------------------
       ! Allocate and zero arrays

@@ -424,7 +424,7 @@
                                               !  current chemistry timestep
 
       ! Dimension AZO for GCAP or GEOS met fields (swu, bmy, 5/25/05)
-#if   defined( GCAP )
+#if   defined( MODELE ) || defined( GCAP )
       REAL*8        :: AZO   (NTYPE       )   ! Z0, per Olson land type
 #else
       REAL*8        :: AZO   (MAXIJ       )   ! Z0, per (I,J) square
@@ -665,7 +665,7 @@
                                                  !  chemistry timestep
 
       ! Dimension AZO for GCAP or GEOS met fields (swu, bmy, 5/25/05)
-#if   defined( GCAP )
+#if   defined( MODELE ) || defined( GCAP )
       REAL*8, INTENT(OUT)  :: AZO(NTYPE)     ! Roughness heights, by landtype
 #else
       REAL*8, INTENT(OUT)  :: AZO(MAXIJ)     ! Roughness heights, by grid box
@@ -729,7 +729,7 @@
       ! METERO begins here!
       !=================================================================
 
-#if   defined( GCAP )
+#if   defined( MODELE ) || defined( GCAP )
       ! For GCAP: AZO (roughness ht) is a function of Olson land type 
       ! instead of lat/lon location.  Zero AZO here; AZO will be 
       ! computed internally w/in routine DEPVEL (swu, bmy, 5/25/05)
@@ -762,7 +762,7 @@
          ! Return meterological quantities as 1-D arrays for DEPVEL
          !==============================================================
 
-#if   !defined( GCAP )
+#if    !defined( MODELE ) && !defined( GCAP )
          ! For GEOS: Roughness height [m] is a function of lat/lon
          AZO(IJLOOP)    = State_Met%Z0(I,J)
 #endif
@@ -1652,7 +1652,7 @@
                                    
       REAL*8  C1X(MAXDEP),VD(MAXDEP),VK(MAXDEP)              
 
-#if   defined( GCAP )
+#if   defined( MODELE ) || defined( GCAP )
       ! For the GISS/GCAP model, ZO is a function of land type 
       ! and is of dimension NTYPE (swu, bmy, 5/25/05)
       REAL*8  ZO(NTYPE)           
@@ -1775,7 +1775,7 @@
 #if defined( TOMAS )
 !$OMP+PRIVATE( BIN                                            )
 #endif
-#if defined( GCAP )
+#if defined( MODELE ) || defined( GCAP )
 !$OMP+PRIVATE( ZO                                             )
 #endif
 
@@ -2126,7 +2126,7 @@
             IF ( IUSE(I,J,LDT) == 0 ) GOTO 500
             IOLSON = ILAND(I,J,LDT) + 1
 
-#if   defined( GCAP )
+#if   defined( MODELE ) || defined( GCAP )
 ! NOTE: This section only applies to the GCAP/GISS model (swu, bmy, 5/25/05)
 !** Get roughness heights; they are specified constants for each surface
 !** type except over water where zo = f(u*).  The latter dependence
@@ -2224,7 +2224,7 @@
             CKUSTR = XCKMAN*USTAR(IJLOOP)
 
             ! Define REYNO for GCAP or GEOS met fields (swu, bmy, 5/25/05)
-#if   defined( GCAP )
+#if   defined( MODELE ) || defined( GCAP )
             REYNO = USTAR(IJLOOP)*ZO(LDT)/XNU 
 #else
             REYNO = USTAR(IJLOOP)*ZO(IJLOOP)/XNU  
@@ -2237,7 +2237,7 @@
             CORR1 = CZ/OBK(IJLOOP)
 
             ! Define Z0OBK for GCAP or GEOS met fields (swu, bmy, 5/25/05)
-#if   defined( GCAP )
+#if   defined( MODELE ) || defined( GCAP )
             Z0OBK = ZO(LDT)/OBK(IJLOOP)
 #else
             Z0OBK = ZO(IJLOOP)/OBK(IJLOOP) 
@@ -2338,7 +2338,7 @@
 
             RA = MIN(RA,1.D4)
 
-#if   defined( GCAP )
+#if   defined( MODELE ) || defined( GCAP )
             ! Debug output for GISS/GCAP model (swu, bmy, 5/25/05)
             IF (RA .LT. 0.) THEN
                WRITE (6,1001) IJLOOP,RA,CZ,ZO(LDT),OBK(IJLOOP)
@@ -2415,7 +2415,7 @@
                PRINT*, 'CFRAC    = ', CFRAC(IJLOOP)
                PRINT*, 'ZH       = ', ZH(IJLOOP)
                PRINT*, 'LRGERA   = ', LRGERA(IJLOOP)
-#if !defined( GCAP )
+#if !defined( MODELE ) && !defined( GCAP )
                PRINT*, 'ZO       = ', ZO(IJLOOP)
 #endif
                PRINT*, 'STOP in depvel.f!'
@@ -2442,7 +2442,7 @@
                PRINT*, 'CFRAC    = ', CFRAC(IJLOOP)
                PRINT*, 'ZH       = ', ZH(IJLOOP)
                PRINT*, 'LRGERA   = ', LRGERA(IJLOOP)
-#if !defined( GCAP )
+#if !defined( MODELE ) && !defined( GCAP )
                PRINT*, 'ZO       = ', ZO(IJLOOP)
 #endif
                CALL CLEANUP

@@ -813,6 +813,7 @@
 ! !USES:
 !
       USE BPCH2_MOD,          ONLY : GET_RES_EXT,  GET_MODELNAME
+      USE BPCH2_MOD,          ONLY : GET_CENTER180, GET_HALFPOLAR
       USE BPCH2_MOD,          ONLY : GET_TAU0,     READ_BPCH2
       USE BPCH2_MOD,          ONLY : GET_NAME_EXT, GET_NAME_EXT_2D
       USE DIRECTORY_MOD,      ONLY : DATA_DIR
@@ -3196,8 +3197,8 @@
       REAL*4              :: LONRES, LATRES
 
       INTEGER             :: IFIRST, JFIRST, LFIRST
-      INTEGER, PARAMETER  :: HALFPOLAR = 1
-      INTEGER, PARAMETER  :: CENTER180 = 1
+      INTEGER             :: HALFPOLAR
+      INTEGER             :: CENTER180
 
       CHARACTER (LEN=20)  :: MODELNAME 
       CHARACTER (LEN=40)  :: UNIT
@@ -3229,6 +3230,8 @@
 
       ! Get the proper model name for the binary punch file
       MODELNAME = GET_MODELNAME()
+      CENTER180 = GET_CENTER180()
+      HALFPOLAR = GET_HALFPOLAR()
 
       ! Descriptor string
       LABEL    = 'GEOS-CHEM -- CH4 Budget output (jsw, bmy, 1/16/01)'

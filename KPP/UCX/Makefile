@@ -81,7 +81,7 @@ lib: $(OBJ)
 	mv libKpp.a $(LIB)
 
 clean:
-	rm -f *.o *.mod geos
+	rm -f *.i *.i90 *.o *.mod geos
 
 help:
 	@$(MAKE) -C $(HELP)

@@ -11,7 +11,8 @@
 !\\
 ! !INTERFACE:
 !
-      SUBROUTINE DIAG3( am_I_Root, Input_Opt, State_Chm, RC )
+      SUBROUTINE DIAG3( am_I_Root, Input_Opt, 
+     &                  State_Met, State_Chm, RC )
 !
 ! !USES:
 !
@@ -25,6 +26,7 @@
       USE FILE_MOD                           
       USE GIGC_ErrCode_Mod
       USE GIGC_Input_Opt_Mod, ONLY : OptInput
+      USE GIGC_State_Met_Mod, ONLY : MetState
       USE GIGC_State_Chm_Mod, ONLY : ChmState
       USE GRID_MOD, ONLY : GET_AREA_M2, GET_YOFFSET, GET_XOFFSET
       USE TIME_MOD
@@ -49,6 +51,9 @@
 #if   defined( TOMAS )
       USE TOMAS_MOD, ONLY : ICOMP, IDIAG, IBINS  !(win, 1/25/10)
 #endif
+#if   defined( QUS )
+      USE DIAG_MASS_FLUX_QUS                 ! For QUS mass flux diagnostic
+#endif
 
 #if   defined( APM )
       USE TRACER_MOD,   ONLY : N_APMTRA
@@ -65,6 +70,7 @@
 !
       LOGICAL,        INTENT(IN)    :: am_I_Root   ! Are we on the root CPU?
       TYPE(OptInput), INTENT(IN)    :: Input_Opt   ! Input Options object
+      TYPE(MetState), INTENT(IN)    :: State_Met   ! Met state object
 !
 ! !INPUT/OUTPUT PARAMETERS:
 !
@@ -239,7 +245,7 @@
       REAL*4             :: LONRES, LATRES
       INTEGER            :: IFIRST, JFIRST, LFIRST
       INTEGER            :: HALFPOLAR
-      INTEGER, PARAMETER :: CENTER180 = 1
+      INTEGER            :: CENTER180
       CHARACTER (LEN=20) :: MODELNAME 
       CHARACTER (LEN=40) :: UNIT
       CHARACTER (LEN=40) :: RESERVED = ''
@@ -269,7 +275,8 @@
 !******************************************************************************
 !
       ! Assume success
-      RC         = GIGC_SUCCESS
+! ltm - causing SIGBUS for some reason?
+      !RC         = GIGC_SUCCESS 
 
       ! Copy values from Input_Opt
       N_TRACERS  = Input_Opt%N_TRACERS
@@ -280,6 +287,9 @@
 #else
       N_TOT_TRC = N_TRACERS              ! G-C advected tracers 
 #endif
+
+      WRITE(6,*) N_TRACERS
+      CALL FLUSH(6)
 
       ! Now use counter variables from "time_mod.f" (bmy, 3/27/03)
       DIAGb      = GET_DIAGb()
@@ -314,6 +324,7 @@
       ! Get the proper model name and HALFPOLAR setting for the bpch file
       MODELNAME = GET_MODELNAME()
       HALFPOLAR = GET_HALFPOLAR()
+      CENTER180 = GET_CENTER180()
 !
 !******************************************************************************
 !  ND01: Rn, Pb, Be emissions (Category: "RN--SRCE")
@@ -1862,9 +1873,13 @@
             N  = TINDEX(24,M)
             IF ( N > N_TRACERS ) CYCLE
             NN = N
-            
+
+#if defined( QUS )
+            ARRAY(:,:,1:LD24) = MASSFLEW(:,:,1:LD24,N) / SCALEDYN
+#else                        
             ARRAY(:,:,1:LD24) = MASSFLEW(:,:,LLPAR:LLPAR-LD24+1:-1,N) /
      &                          SCALEDYN
+#endif
 
             CALL BPCH2( IU_BPCH,   MODELNAME, LONRES,   LATRES,
      &                  HALFPOLAR, CENTER180, CATEGORY, NN,
@@ -1896,8 +1911,12 @@
             IF ( N > N_TRACERS ) CYCLE
             NN = N
 
+#if defined( QUS )
+            ARRAY(:,:,1:LD25) = MASSFLNS(:,:,1:LD25,N) / SCALEDYN
+#else            
             ARRAY(:,:,1:LD25) = MASSFLNS(:,:,LLPAR:LLPAR-LD25+1:-1,N) /
      &                          SCALEDYN
+#endif
 
             CALL BPCH2( IU_BPCH,   MODELNAME, LONRES,   LATRES,
      &                  HALFPOLAR, CENTER180, CATEGORY, NN,
@@ -1929,8 +1948,12 @@
             IF ( N > N_TRACERS ) CYCLE
             NN = N
             
+#if defined( QUS )
+            ARRAY(:,:,1:LD26) = MASSFLUP(:,:,1:LD26,N) / SCALEDYN
+#else              
             ARRAY(:,:,1:LD26) = MASSFLUP(:,:,LLPAR:LLPAR-LD26+1:-1,N) /
      &                          SCALEDYN
+#endif
                
             CALL BPCH2( IU_BPCH,   MODELNAME, LONRES,   LATRES, 
      &                  HALFPOLAR, CENTER180, CATEGORY, NN,
@@ -4296,7 +4319,7 @@
                   SCALEX = SCALE_ND67
                   UNIT   = 'unitless'
 
-#if   defined( GCAP )
+#if   defined( MODELE ) || defined( GCAP )
                   ! CLDFRC is a 6-hr field in GCAP, GEOS-STRAT 
                   ! (swu, bmy, 6/9/05)
                   SCALEX = SCALE_A6
@@ -4476,6 +4499,15 @@
 
       ! Echo output
       WRITE( 6, '(a)' ) '     - DIAG3: Diagnostics written to bpch!'
+
+!
+!******************************************************************************
+!  Write netCDF diagnostics
+!******************************************************************************
+!
+#if defined( QUS )
+      IF ( Input_Opt%LTRAN .and. DIAG_MFLUX ) CALL WRITE_DIAG_MASS_FLUX
+#endif
 
       END SUBROUTINE DIAG3    
 !EOC

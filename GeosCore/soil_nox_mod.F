@@ -174,6 +174,9 @@
      &                              PFACTOR,   SOILNOx, 
      &                              DEPN,      FERTDIAG, 
      &                              CLIM,      LANDFRAC,
+#if defined( ICECAP )
+     &                              LGM_ICE,
+#endif
      &                              RC,        SUNCOS,
      &                              U10M,      V10M,
      &				    R_CANOPY,  LAI)
@@ -192,6 +195,9 @@
       REAL*4,  INTENT(IN)  :: CLIM(:)     ! CLIM(1), arid fraction
                                           ! CLIM(2), non-arid fraction
       REAL*4,  INTENT(IN)  :: LANDFRAC(:) ! Fraction of landtypes
+#if defined( ICECAP )
+      REAL*8,  INTENT(IN)  :: LGM_ICE     ! Land Ice Map
+#endif
 
       !Input parameters for the canopy reduction factor
       REAL*8,  INTENT(IN)  :: SUNCOS      ! Cosine of solar zenith angle
@@ -279,11 +285,14 @@
      & 			      WINDSQR, SUNCOS )
        
          ! SOILNOX includes fertilizer
-         SOILNOX   = (SOILNOX 
+         SOILNOX   = SOILNOX 
      &             + ( A_BIOME(K) + A_FERT )
      &             * ( TEMP_TERM * WET_TERM * PULSE ) 
      &             * LANDFRAC(K)
-     &             * ( 1.d0 - CRF_TERM  ) )
+     &             * ( 1.d0 - CRF_TERM  )
+#if defined( ICECAP )
+     &             * ( 1.0d0 - LGM_ICE )
+#endif
 
          ! FERTDIAG, only used for the fertilizer diagnostic
          FERTDIAG  = (FERTDIAG

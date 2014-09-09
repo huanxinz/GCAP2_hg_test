@@ -22,7 +22,7 @@
 !
       CHARACTER(LEN=255) :: DATA_DIR      ! Main DAO met field directory
       CHARACTER(LEN=255) :: DATA_DIR_1x1  ! Root data dir for 1x1 emissions
-      CHARACTER(LEN=255) :: GCAP_DIR      ! Subdir for GCAP met data
+      CHARACTER(LEN=255) :: GISS_DIR      ! Subdir for GISS met data
       CHARACTER(LEN=255) :: GEOS_1_DIR    ! !%%% OBSOLETE %%%
       CHARACTER(LEN=255) :: GEOS_S_DIR    ! !%%% OBSOLETE 
       CHARACTER(LEN=255) :: GEOS_4_DIR    ! Subdir for GEOS-4 met data
@@ -51,7 +51,7 @@
 !
 ! !REVISION HISTORY:
 !  20 Jul 2004 - R. Yantosca - Initial version
-!  25 May 2005 - R. Yantosca - Added variables GCAP_DIR and GEOS_5_DIR
+!  25 May 2005 - R. Yantosca - Added variables GISS_DIR and GEOS_5_DIR
 !  24 Oct 2005 - R. Yantosca - Added DATA_DIR_1x1
 !  20 Nov 2009 - R. Yantosca - Added ProTeX header
 !  18 Dec 2009 - Aaron van D - Added TPBC_DIR_NA, TPBC_DIR_EU, TPBC_DIR_CH
@@ -62,6 +62,7 @@
 !  29 May 2012 - S. Kim      - Added directory for SEAC4RS BCs
 !  20 Aug 2013 - R. Yantosca - Removed "define.h", this is now obsolete
 !  26 Sep 2013 - R. Yantosca - Renamed GEOS_57_DIR to GEOS_FP_DIR
+!  06 Jul 2014 - L. Murray   - Renamed GISS_DIR to GISS_DIR
 !EOP
 !------------------------------------------------------------------------------
 !BOC

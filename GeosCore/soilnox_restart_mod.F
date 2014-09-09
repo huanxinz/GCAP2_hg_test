@@ -55,6 +55,7 @@
 !
       USE BPCH2_MOD,          ONLY : BPCH2
       USE BPCH2_MOD,          ONLY : GET_HALFPOLAR
+      USE BPCH2_MOD,          ONLY : GET_CENTER180
       USE BPCH2_MOD,          ONLY : GET_MODELNAME
       USE BPCH2_MOD,          ONLY : OPEN_BPCH2_FOR_WRITE
       USE CMN_SIZE_MOD
@@ -101,7 +102,7 @@
       REAL*4               :: LONRES, LATRES
       REAL*4               :: DRES(IGLOB, JGLOB) 
       INTEGER              :: HALFPOLAR
-      INTEGER, PARAMETER   :: CENTER180 = 1
+      INTEGER              :: CENTER180
       CHARACTER(LEN=20)    :: MODELNAME
       CHARACTER(LEN=40)    :: CATEGORY
       CHARACTER(LEN=40)    :: UNIT     
@@ -124,8 +125,10 @@
       MODELNAME = GET_MODELNAME()
 
       ! Call GET_HALFPOLAR to return the proper value
-      ! for either GCAP or GEOS grids (bmy, 6/28/05)
       HALFPOLAR = GET_HALFPOLAR()
+
+      ! Call GET_CENTER180 to return the proper value
+      CENTER180 = GET_CENTER180()
 
       ! Get the nested-grid offsets
       I0        = GET_XOFFSET( GLOBAL=.TRUE. )

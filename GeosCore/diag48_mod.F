@@ -109,7 +109,7 @@
       INTEGER              :: ND48_FREQ
       INTEGER              :: ND48_N_STATIONS
       INTEGER              :: HALFPOLAR
-      INTEGER, PARAMETER   :: CENTER180=1 
+      INTEGER              :: CENTER180 
       REAL*4               :: LONRES
       REAL*4               :: LATRES
       CHARACTER(LEN=20)    :: MODELNAME
@@ -900,7 +900,7 @@
 !******************************************************************************
 !
       ! References to F90 modules
-      USE BPCH2_MOD, ONLY : GET_MODELNAME, GET_HALFPOLAR
+      USE BPCH2_MOD, ONLY : GET_MODELNAME, GET_HALFPOLAR, GET_CENTER180
       USE ERROR_MOD, ONLY : ALLOC_ERR, ERROR_STOP
 
       USE CMN_SIZE_MOD  ! Size parameters
@@ -991,6 +991,7 @@
       LATRES    = DJSIZE
       MODELNAME = GET_MODELNAME()
       HALFPOLAR = GET_HALFPOLAR()
+      CENTER180 = GET_CENTER180()
 
       ! Return to calling program
       END SUBROUTINE INIT_DIAG48

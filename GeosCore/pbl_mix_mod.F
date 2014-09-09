@@ -212,7 +212,6 @@
       USE PRESSURE_MOD,       ONLY : GET_PEDGE
 
       USE CMN_SIZE_MOD             ! Size parameters
-      USE CMN_GCTM_MOD             ! Scale height
 !
 ! !INPUT PARAMETERS: 
 !
@@ -229,6 +228,7 @@
 !  28 Feb 2012 - R. Yantosca - Added ProTeX headers
 !  09 Nov 2012 - M. Payer    - Replaced all met field arrays with State_Met
 !                              derived type object
+!  08 Jul 2014 - L. Murray   - Use actual local scale height instead of 7.6km
 !EOP
 !------------------------------------------------------------------------------
 !BOC
@@ -238,6 +238,7 @@
       INTEGER :: I,     J,      L,    LTOP
       REAL*8  :: BLTOP, BLTHIK, DELP
       REAL*8  :: P(0:LLPAR)
+      REAL*8  :: H ! Scale height at surface
 
       !=================================================================
       ! COMPUTE_PBL_HEIGHT begins here!
@@ -245,7 +246,7 @@
 
 !$OMP PARALLEL DO 
 !$OMP+DEFAULT( SHARED )
-!$OMP+PRIVATE( I, J, L, P, BLTOP, BLTHIK, LTOP, DELP )
+!$OMP+PRIVATE( I, J, L, H, P, BLTOP, BLTHIK, LTOP, DELP )
       DO J = 1, JJPAR
       DO I = 1, IIPAR
 
@@ -264,9 +265,13 @@
          ! Find PBL top and thickness [hPa]
          !----------------------------------------------
 
+         ! Scale height at surface [m]
+         H = 1.38d-23 * State_Met%T(I,J,1) / 
+     &        ( 28.97d-3 * 9.80665d0 / 6.022d23 )
+
          ! BLTOP = pressure at PBL top [hPa]
          ! Use barometric law since PBL is in [m]
-         BLTOP  = P(0) * EXP( -State_Met%PBLH(I,J) / SCALE_HEIGHT )
+         BLTOP  = P(0) * EXP( -State_Met%PBLH(I,J) / H )
 
          ! BLTHIK is PBL thickness [hPa]
          BLTHIK = P(0) - BLTOP

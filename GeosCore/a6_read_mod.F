@@ -43,7 +43,7 @@
 !  (7 ) Now references "unix_cmds_mod.f", "directory_mod.f" and
 !        "logical_mod.f" (bmy, 7/20/04)
 !  (8 ) Now references FILE_EXISTS from "file_mod.f" (bmy, 3/23/05)
-!  (9 ) Now modified for GEOS-5 and GCAP met fields.  Added MAKE_GCAP_CLDFRC
+!  (9 ) Now modified for GEOS-5 and GCAP met fields.  Added MAKE_GISS_CLDFRC
 !        routine. (swu, bmy, 5/25/05)
 !  (10) Now make sure all USE statements are USE, ONLY (bmy, 10/3/05)
 !  (11) Bug fix in ND66 diagnostic for ZMMU (bmy, 2/1/06)
@@ -148,10 +148,10 @@
          GEOS_DIR = TRIM( Input_Opt%GEOS_5_DIR )
          A6_STR   = 'YYYYMMDD.a6.' // GET_RES_EXT() 
 
-#elif defined( GCAP )
+#elif defined( MODELE ) || defined( GCAP )
 
          ! Strings for directory & filename
-         GEOS_DIR = TRIM( Input_Opt%GCAP_DIR )
+         GEOS_DIR = TRIM( Input_Opt%GISS_DIR )
          A6_STR   = 'YYYYMMDD.a6.' // GET_RES_EXT() 
 
 #endif
@@ -288,7 +288,7 @@
          GOTO 999
       ENDIF
 
-#if   defined( GCAP )
+#if   defined( MODELE ) || defined( GCAP )
 
       ! Open file if it's 03 GMT or first call (GCAP only) 
       IF ( NHMS == 030000 .or. FIRST ) THEN
@@ -400,10 +400,10 @@
          GEOS_DIR = TRIM( Input_Opt%GEOS_5_DIR )
          A6_FILE  = 'YYYYMMDD.a6.' // GET_RES_EXT()
 
-#elif defined( GCAP )
+#elif defined( MODELE ) || defined( GCAP )
 
          ! Strings for directory & filename
-         GEOS_DIR = TRIM( Input_Opt%GCAP_DIR )
+         GEOS_DIR = TRIM( Input_Opt%GISS_DIR )
          A6_FILE  = 'YYYYMMDD.a6.' // GET_RES_EXT()
 
 #endif
@@ -607,7 +607,7 @@
      &                 V          = State_Met%V,
      &                 T_FULLGRID = T_FULLGRID ) 
 
-#elif defined( GCAP ) 
+#elif defined( GCAP ) || defined( MODEL3 )
 
          !--------------------------------------------------------------
          ! Read fields for GCAP meteorology
@@ -632,7 +632,42 @@
      &                 T_FULLGRID = T_FULLGRID ) 
 
          ! Create 2-D CLDFRC field from 3-D CLDF field
-         CALL MAKE_GCAP_CLDFRC( State_Met%CLDF, State_Met%CLDFRC )
+         CALL MAKE_GISS_CLDFRC( State_Met%CLDF, State_Met%CLDFRC )
+
+#elif defined( MODELE )
+
+      !=================================================================
+      ! GISS Model E: read CLDF,  DETRAINE, DETRAIN, DNDE, DNDN, ENTRAIN,   
+      !            MOISTQ, OPTDEPTH, SPHU,    T=T,  UWND, UPDE,
+      !            UPDN,   VWND, C_EU1, C_ED1, C_ED2, C_OD1, C_OD2
+      !=================================================================
+
+         CALL READ_A6( NYMD       = NYMD,          
+     &                 NHMS       = NHMS,         
+     &                 CLDF       = State_Met%CLDF,          
+     &                 CLDTOPS    = State_Met%CLDTOPS,
+     &                 C_ED1      = State_Met%C_ED1,
+     &                 C_ED2      = State_Met%C_ED2,
+     &                 C_EU1      = State_Met%C_EU1,
+     &                 C_OD1      = State_Met%C_OD1,
+     &                 C_OD2      = State_Met%C_OD2, 
+     &                 DETRAINE   = State_Met%DETRAINE,  
+     &                 DETRAINN   = State_Met%DETRAINN, 
+     &                 DNDE       = State_Met%DNDE,          
+     &                 DNDN       = State_Met%DNDN,         
+     &                 ENTRAIN    = State_Met%ENTRAIN,    
+     &                 MOISTQ     = State_Met%MOISTQ,
+     &                 OPTDEPTH   = State_Met%OPTDEP,    
+     &                 Q          = State_Met%SPHU,            
+     &                 T          = State_Met%T,                
+     &                 U          = State_Met%U,
+     &                 UPDE       = State_Met%UPDE,          
+     &                 UPDN       = State_Met%UPDN,  
+     &                 V          = State_Met%V,
+     &                 T_FULLGRID = T_FULLGRID ) 
+
+      ! Create 2-D CLDFRC field from 3-D CLDF field
+      CALL MAKE_GISS_CLDFRC( State_Met%CLDF, State_Met%CLDFRC )
       
 #endif
 
@@ -691,7 +726,7 @@
      &                 U          = State_Met%U,             
      &                 V          = State_Met%V )
 
-#elif defined( GCAP ) 
+#elif defined( MODEL3 ) || defined( GCAP ) 
 
          !--------------------------------------------------------------
          ! Read fields for GCAP meteorology
@@ -715,8 +750,42 @@
      &                 V          = State_Met%V )
      
          ! Create 2-D CLDFRC field from 3-D CLDF field
-         CALL MAKE_GCAP_CLDFRC( State_Met%CLDF, State_Met%CLDFRC )
+         CALL MAKE_GISS_CLDFRC( State_Met%CLDF, State_Met%CLDFRC )
       
+#elif defined( MODELE )
+
+      !=================================================================
+      ! GISS Model E: read CLDF,  DETRAINE, DETRAIN, DNDE, DNDN, ENTRAIN,   
+      !            MOISTQ, OPTDEPTH, SPHU,    T=T,  U, UPDE,
+      !            UPDN,   VWND, C_EU1, C_ED1, C_ED2, C_OD1, C_OD2
+      !=================================================================
+
+         CALL READ_A6( NYMD       = NYMD,          
+     &                 NHMS       = NHMS,         
+     &                 CLDF       = State_Met%CLDF,          
+     &                 CLDTOPS    = State_Met%CLDTOPS,
+     &                 C_ED1      = State_Met%C_ED1,
+     &                 C_ED2      = State_Met%C_ED2,
+     &                 C_EU1      = State_Met%C_EU1,
+     &                 C_OD1      = State_Met%C_OD1,
+     &                 C_OD2      = State_Met%C_OD2, 
+     &                 DETRAINE   = State_Met%DETRAINE,  
+     &                 DETRAINN   = State_Met%DETRAINN, 
+     &                 DNDE       = State_Met%DNDE,          
+     &                 DNDN       = State_Met%DNDN,         
+     &                 ENTRAIN    = State_Met%ENTRAIN,    
+     &                 MOISTQ     = State_Met%MOISTQ,
+     &                 OPTDEPTH   = State_Met%OPTDEP,    
+     &                 Q          = State_Met%SPHU,            
+     &                 T          = State_Met%T,                
+     &                 U          = State_Met%U,            
+     &                 UPDE       = State_Met%UPDE,          
+     &                 UPDN       = State_Met%UPDN,  
+     &                 V          = State_Met%V )
+
+      ! Create 2-D CLDFRC field from 3-D CLDF field
+      CALL MAKE_GISS_CLDFRC( State_Met%CLDF, State_Met%CLDFRC )
+
 #endif
 
       ENDIF
@@ -740,7 +809,7 @@
 !\\
 ! !INTERFACE:
 !
-      SUBROUTINE MAKE_GCAP_CLDFRC( CLDF, CLDFRC )
+      SUBROUTINE MAKE_GISS_CLDFRC( CLDF, CLDFRC )
 !
 ! !USES:
 !
@@ -771,7 +840,7 @@
       INTEGER             :: I, J
       
       !=================================================================
-      ! MAKE_GCAP_CLDFRC begins here!
+      ! MAKE_GISS_CLDFRC begins here!
       !=================================================================
 
       ! Is the ND67 diagnostic turned on?
@@ -793,7 +862,144 @@
       ENDDO
 !$OMP END PARALLEL DO
 
-      END SUBROUTINE MAKE_GCAP_CLDFRC
+      END SUBROUTINE MAKE_GISS_CLDFRC
+
+!------------------------------------------------------------------------------
+!EOC
+!------------------------------------------------------------------------------
+!                  GEOS-Chem Global Chemical Transport Model                  !
+!------------------------------------------------------------------------------
+!BOP
+!
+      SUBROUTINE MAKE_GISS_WINDS( U, V )
+!
+!******************************************************************************
+!  Subroutine MAKE_GISS_WINDS converts the GISS winds on the native B grid
+!  to the C GRID, as readable by TPCORE.
+!
+!  Arguments as Input/Output:
+!  ===========================================================================
+!  (1 ) U   (REAL*8) : GISS east-west wind [m/s]
+!  (2 ) V   (REAL*8) : GISS north-south wind [m/s]
+!
+!  NOTES:
+!******************************************************************************
+!
+      ! References to F90 modules
+      USE CMN_SIZE_MOD   ! Size parameters
+      USE GEOM_GISS_MOD  ! Geometry specific to GISS simulations
+      USE FFT72
+
+      USE ERROR_MOD, ONLY : GEOS_CHEM_STOP
+
+      IMPLICIT NONE
+
+      ! Arguments
+      REAL*8, INTENT(INOUT), DIMENSION(IIPAR,JJPAR,LLPAR) :: U, V
+
+      ! Local variables
+      LOGICAL, SAVE :: FIRST = .true.
+
+      REAL*8, DIMENSION(IIPAR,JJPAR,LLPAR) :: UB, VB ! winds on B grid
+      REAL*8, DIMENSION(IIPAR,JJPAR,LLPAR) :: UA, VA ! winds on A grid
+
+      INTEGER                    :: IMH
+      REAL*8                     :: hemi
+      REAL*8, ALLOCATABLE        :: AN(:), BN(:)
+      INTEGER                    :: I, J, K, L, N
+      REAL*8                     :: test(72)
+
+      ! Intialize
+      UA = 0d0
+      VA = 0d0
+      IMH = IIPAR / 2
+      ALLOCATE( AN(0:IMH) )
+      ALLOCATE( BN(0:IMH) )
+      IF ( FIRST ) THEN
+         CALL GEOM_B
+         CALL FFT0( IIPAR )
+      ENDIF
+      FIRST = .false.
+
+#if defined( QUS )
+      ! Do Nothing
+#else
+
+#if defined( GCAP )
+
+      ! GCAP met fields are already on the AGRID
+      UA = U
+      VA = V
+
+      ! Note: the Fourier polar filter below is designed to work with the 
+      ! native GISS resolution, with the 46 latitude bands.
+      ! It probably will still improve GCAP, but technically the
+      ! damping coefficients would be different.
+
+#else
+
+      ! GISS input winds are on the GISS Arakawa B Grid
+      UB = U
+      VB = V
+
+      ! Convert winds from Arakawa B to Arakawa A grid
+      DO L=1,LLPAR
+      DO I=1,IIPAR
+      DO J=1,JJPAR
+      DO K=1,KMAXJ(J)
+         ! Do poles
+         IF ( J .eq. 1 .or. J .eq. JJPAR ) THEN
+         IF ( J .eq. 1 ) THEN
+            hemi = -1.0 ! South Pole
+         ELSE
+            hemi =  1.0 ! North Pole
+         ENDIF
+         UA(i,j,l) = UA(i,j,l) +
+     &           rapj(k,j)*(u(idij(k,i,j),idjj(k,j),l)*cosiv(k) -
+     &           hemi*v(idij(k,i,j),idjj(k,j),l)*siniv(k))
+         VA(i,j,l) = VA(i,j,l) + 
+     &           rapj(k,j)*(v(idij(k,i,j),idjj(k,j),l)*cosiv(k) +
+     &           hemi*u(idij(k,i,j),idjj(k,j),l)*siniv(k))
+         ELSE
+         ! Other latitudes
+         UA(i,j,l) = UA(i,j,l) + UB(idij(k,i,j),idjj(k,j),l) * rapj(k,j)
+         VA(i,j,l) = VA(i,j,l) + VB(idij(k,i,j),idjj(k,j),l) * rapj(k,j)
+         ENDIF
+      ENDDO
+      ENDDO
+      ENDDO
+      ENDDO
+
+#endif
+
+      ! Apply FFT filter to reduce noise in U winds, as done by the GCM
+      if ( .false. ) then
+      DO J=1,JJPAR
+      IF ( DRAT(J) .gt. 1 ) CYCLE
+      DO L=1,LLPAR
+         CALL FFT( UA(:,J,L), AN, BN )
+         DO N=NMIN(J),IMH-1
+            AN(N) = BYSN(N) * DRAT(J) * AN(N)
+            BN(N) = BYSN(N) * DRAT(J) * BN(N)
+         ENDDO
+         AN(IMH) = BYSN(IMH) * DRAT(J) * AN(IMH)
+         CALL FFTI( AN, BN, UA(:,J,L) )
+      ENDDO
+      ENDDO
+      endif
+
+      ! Output winds are on the Arakawa A grid
+      U = UA
+      V = VA
+
+#endif
+! endif not defined QUS
+
+      IF ( ALLOCATED( AN ) ) DEALLOCATE( AN )
+      IF ( ALLOCATED( BN ) ) DEALLOCATE( BN )
+
+      ! Return to calling program
+      END SUBROUTINE MAKE_GISS_WINDS
 !EOC
 !------------------------------------------------------------------------------
 !                  GEOS-Chem Global Chemical Transport Model                  !
@@ -845,6 +1051,11 @@
       
       ! GCAP has 14 A-6 fields
       N_A6 = 14
+
+#elif defined( MODELE )
+
+      ! GISS ModelE has 19 A-6 fields
+      N_A6 = 19
 
 #endif
 
@@ -913,6 +1124,8 @@
 !
       SUBROUTINE READ_A6( NYMD,      NHMS,   
      &                    CLDF,      CLDMAS,    CLDTOPS,   CMFMC, 
+     &                    C_ED1,     C_ED2,     C_EU1,     C_OD1,
+     &                    C_OD2,
      &                    DETRAINE,  DETRAINN,  DNDE,      DNDN,     
      &                    DQIDTMST,  DQLDTMST,  DQRCON,    DQRLSC,      
      &                    DQVDTMST,  DTRAIN,    ENTRAIN,   HKBETA,    
@@ -945,6 +1158,11 @@
       REAL*8,  INTENT(OUT), OPTIONAL :: CLDF(LLPAR,IIPAR,JJPAR)
       REAL*8,  INTENT(OUT), OPTIONAL :: CLDMAS(IIPAR,JJPAR,LLPAR)
       REAL*8,  INTENT(OUT), OPTIONAL :: CMFMC(IIPAR,JJPAR,LLPAR+1)
+      REAL*8,  INTENT(OUT), OPTIONAL :: C_ED1(IIPAR,JJPAR,LLPAR)
+      REAL*8,  INTENT(OUT), OPTIONAL :: C_ED2(IIPAR,JJPAR,LLPAR)
+      REAL*8,  INTENT(OUT), OPTIONAL :: C_EU1(IIPAR,JJPAR,LLPAR)
+      REAL*8,  INTENT(OUT), OPTIONAL :: C_OD1(IIPAR,JJPAR,LLPAR)
+      REAL*8,  INTENT(OUT), OPTIONAL :: C_OD2(IIPAR,JJPAR,LLPAR)
       REAL*8,  INTENT(OUT), OPTIONAL :: DETRAINE(IIPAR,JJPAR,LLPAR)
       REAL*8,  INTENT(OUT), OPTIONAL :: DETRAINN(IIPAR,JJPAR,LLPAR)
       REAL*8,  INTENT(OUT), OPTIONAL :: DNDE(IIPAR,JJPAR,LLPAR)
@@ -1145,7 +1363,7 @@
             !--------------------------------------
             ! DETRAINE: GCAP Detrainment (ent pl)
             !--------------------------------------
-            CASE ( 'DETRAINE' ) 
+            CASE ( 'DETRAINE', 'C_OU2' ) 
                READ( IU_A6, IOSTAT=IOS ) XYMD, XHMS, D
                IF ( IOS /= 0 ) CALL IOERROR( IOS, IU_A6, 'read_a6:5' )
  
@@ -1159,7 +1377,7 @@
             !--------------------------------------
             ! DETRAINN: GCAP Detrainment (non-ent)
             !--------------------------------------
-            CASE ( 'DETRAINN' ) 
+            CASE ( 'DETRAINN', 'C_OU1' ) 
                READ( IU_A6, IOSTAT=IOS ) XYMD, XHMS, D
                IF ( IOS /= 0 ) CALL IOERROR( IOS, IU_A6, 'read_a6:6' )
  
@@ -1173,7 +1391,7 @@
             !--------------------------------------
             ! DNDE: GCAP Downdraft (ent plume)
             !--------------------------------------
-            CASE ( 'DNDE' ) 
+            CASE ( 'DNDE', 'C_DD2' ) 
                READ( IU_A6, IOSTAT=IOS ) XYMD, XHMS, D
                IF ( IOS /= 0 ) CALL IOERROR( IOS, IU_A6, 'read_a6:7' )
  
@@ -1185,7 +1403,7 @@
             !--------------------------------------
             ! DNDN: GCAP Downdraft (non-ent plume)
             !--------------------------------------
-            CASE ( 'DNDN' ) 
+            CASE ( 'DNDN', 'C_DD1' ) 
                READ( IU_A6, IOSTAT=IOS ) XYMD, XHMS, D
                IF ( IOS /= 0 ) CALL IOERROR( IOS, IU_A6, 'read_a6:8' )
  
@@ -1279,7 +1497,7 @@
             !--------------------------------------
             ! ENTRAIN: GCAP Entrainment
             !--------------------------------------
-            CASE ( 'ENTRAIN' ) 
+            CASE ( 'ENTRAIN', 'C_EU2' ) 
                READ( IU_A6, IOSTAT=IOS ) XYMD, XHMS, D
                IF ( IOS /= 0 ) CALL IOERROR( IOS, IU_A6, 'read_a6:15' )
  
@@ -1511,7 +1729,7 @@
             !--------------------------------------
             ! UPDE: GCAP Downdraft (ent plume)
             !--------------------------------------
-            CASE ( 'UPDE' ) 
+            CASE ( 'UPDE', 'C_UP2' ) 
                READ( IU_A6, IOSTAT=IOS ) XYMD, XHMS, D
                IF ( IOS /= 0 ) CALL IOERROR( IOS, IU_A6, 'read_a6:33' )
  
@@ -1523,7 +1741,7 @@
             !--------------------------------------
             ! UPDN: Downdraft (non-ent plume)
             !--------------------------------------
-            CASE ( 'UPDN' ) 
+            CASE ( 'UPDN', 'C_UP1' ) 
                READ( IU_A6, IOSTAT=IOS ) XYMD, XHMS, D
                IF ( IOS /= 0 ) CALL IOERROR( IOS, IU_A6, 'read_a6:34' )
  
@@ -1615,6 +1833,71 @@
                   NFOUND = NFOUND + 1 
                ENDIF
 
+            !--------------------------------------
+            ! C_EU1: GISS Model E Entrainment below 800mb by UP1
+            !        [Pa s-1]
+            !--------------------------------------
+            CASE ( 'C_EU1' ) 
+               READ( IU_A6, IOSTAT=IOS ) XYMD, XHMS, D
+               IF ( IOS /= 0 ) CALL IOERROR( IOS, IU_A6,'read_a6:c_eu1')
+
+               IF ( CHECK_TIME( XYMD, XHMS, NYMD, NHMS ) ) THEN
+                  IF ( PRESENT( C_EU1 ) ) CALL TRANSFER_3D( D, C_EU1 )
+                  NFOUND = NFOUND + 1 
+               ENDIF
+
+            !--------------------------------------
+            ! C_ED1: GISS Model E Entrainment by DD1
+            !         [Pa s-1]
+            !--------------------------------------
+            CASE ( 'C_ED1' ) 
+               READ( IU_A6, IOSTAT=IOS ) XYMD, XHMS, D
+               IF ( IOS /= 0 ) CALL IOERROR( IOS, IU_A6,'read_a6:c_ed1')
+
+               IF ( CHECK_TIME( XYMD, XHMS, NYMD, NHMS ) ) THEN
+                  IF ( PRESENT( C_ED1 ) ) CALL TRANSFER_3D( D, C_ED1 )
+                  NFOUND = NFOUND + 1 
+               ENDIF
+
+            !--------------------------------------
+            ! C_ED2: GISS Model E Entrainment by DD2
+            !         [Pa s-1]
+            !--------------------------------------
+            CASE ( 'C_ED2' ) 
+               READ( IU_A6, IOSTAT=IOS ) XYMD, XHMS, D
+               IF ( IOS /= 0 ) CALL IOERROR( IOS, IU_A6,'read_a6:c_ed2')
+
+               IF ( CHECK_TIME( XYMD, XHMS, NYMD, NHMS ) ) THEN
+                  IF ( PRESENT( C_ED2 ) ) CALL TRANSFER_3D( D, C_ED2 )
+                  NFOUND = NFOUND + 1 
+               ENDIF
+
+            !--------------------------------------
+            ! C_OD1: GISS Model E Outflow from DD1
+            !         [Pa s-1]
+            !--------------------------------------
+            CASE ( 'C_OD1' ) 
+               READ( IU_A6, IOSTAT=IOS ) XYMD, XHMS, D
+               IF ( IOS /= 0 ) CALL IOERROR( IOS, IU_A6,'read_a6:c_od1')
+
+               IF ( CHECK_TIME( XYMD, XHMS, NYMD, NHMS ) ) THEN
+                  IF ( PRESENT( C_OD1 ) ) CALL TRANSFER_3D( D, C_OD1 )
+                  NFOUND = NFOUND + 1 
+               ENDIF
+
+            !--------------------------------------
+            ! C_OD2: GISS Model E Outflow from DD2
+            !         [Pa s-1]
+            !--------------------------------------
+            CASE ( 'C_OD2' ) 
+               READ( IU_A6, IOSTAT=IOS ) XYMD, XHMS, D
+               IF ( IOS /= 0 ) CALL IOERROR( IOS, IU_A6,'read_a6:c_od2')
+
+               IF ( CHECK_TIME( XYMD, XHMS, NYMD, NHMS ) ) THEN
+                  IF ( PRESENT( C_OD2 ) ) CALL TRANSFER_3D( D, C_OD2 )
+                  NFOUND = NFOUND + 1 
+               ENDIF
+
             ! Field not found -- skip over
             CASE DEFAULT
                WRITE ( 6, '(a)' ) 'Searching for next A-6 field!'
@@ -1647,7 +1930,7 @@
       ! For GEOS-5 : mass flux is "CMFMC"  field
       ! For GCAP   : mass flux is "UPDN"   field
       !=================================================================
-#if   defined( GCAP )
+#if   defined( GISS ) || defined( GCAP )
 
       !------------------------------
       ! Special handling for GCAP
@@ -1667,6 +1950,9 @@
          ENDDO
          ENDDO
       ENDIF     
+
+      ! Apply FFT to GISS winds, consistent with GISS model
+      CALL MAKE_GISS_WINDS( U, V )
 
 #elif defined( GEOS_4 )
 

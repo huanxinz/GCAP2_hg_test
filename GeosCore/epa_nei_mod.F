@@ -857,7 +857,7 @@
 !
       USE BPCH2_MOD,            ONLY : GET_NAME_EXT_2D
       USE BPCH2_MOD,            ONLY : GET_RES_EXT
-      USE DIRECTORY_MOD,        ONLY : DATA_DIR
+      USE DIRECTORY_MOD,        ONLY : DATA_DIR, DATA_DIR_1x1
       USE FUTURE_EMISSIONS_MOD, ONLY : GET_FUTURE_SCALE_ALK4ff  
       USE FUTURE_EMISSIONS_MOD, ONLY : GET_FUTURE_SCALE_C2H6ff
       USE FUTURE_EMISSIONS_MOD, ONLY : GET_FUTURE_SCALE_C3H8ff
@@ -940,13 +940,23 @@
 
       ! Weekday anthro file name
       IF ( LICARTT ) THEN
+#if defined( MODELE )
+         FILENAME = TRIM( DATA_DIR_1x1 )                     //
+     &              'EPA_NEI_200806/wkday_avg_an.YYYYMM.geos.1x1'
+#else
          FILENAME = TRIM( DATA_DIR )                         // 
      &              'EPA_NEI_200806/wkday_avg_an.YYYYMM.'    //
      &              GET_NAME_EXT_2D() // '.' // GET_RES_EXT()     
+#endif
       ELSE
+#if defined( MODELE )
+         FILENAME = TRIM( DATA_DIR_1x1 )                     // 
+     &              'EPA_NEI_200708/wkday_avg_an.YYYYMM.geos.1x1'
+#else
          FILENAME = TRIM( DATA_DIR )                         // 
      &              'EPA_NEI_200708/wkday_avg_an.YYYYMM.'    //
      &               GET_NAME_EXT_2D() // '.' // GET_RES_EXT()     
+#endif
       ENDIF
          
       ! Replace date in filename
@@ -978,13 +988,23 @@
 
       ! Weekday anthro file name
       IF ( LICARTT ) THEN
+#if defined( MODELE )
+         FILENAME = TRIM( DATA_DIR_1x1 )                     // 
+     &              'EPA_NEI_200806/wkend_avg_an.YYYYMM.geos.1x1'
+#else
          FILENAME = TRIM( DATA_DIR )                         // 
      &              'EPA_NEI_200806/wkend_avg_an.YYYYMM.'    //
      &              GET_NAME_EXT_2D() // '.' // GET_RES_EXT()     
+#endif
       ELSE
+#if defined( MODELE )
+         FILENAME = TRIM( DATA_DIR_1x1 )                     //
+     &              'EPA_NEI_200708/wkend_avg_an.YYYYMM.geos.1x1'
+#else
          FILENAME = TRIM( DATA_DIR )                         // 
      &              'EPA_NEI_200708/wkend_avg_an.YYYYMM.'    //
      &              GET_NAME_EXT_2D() // '.' // GET_RES_EXT()     
+#endif
       ENDIF
 
       ! Replace date in filename
@@ -1124,7 +1144,7 @@
 !
       USE BPCH2_MOD,            ONLY : GET_NAME_EXT_2D
       USE BPCH2_MOD,            ONLY : GET_RES_EXT
-      USE DIRECTORY_MOD,        ONLY : DATA_DIR
+      USE DIRECTORY_MOD,        ONLY : DATA_DIR, DATA_DIR_1x1
       USE FUTURE_EMISSIONS_MOD, ONLY : GET_FUTURE_SCALE_CObf  
       USE FUTURE_EMISSIONS_MOD, ONLY : GET_FUTURE_SCALE_NH3bf
       USE FUTURE_EMISSIONS_MOD, ONLY : GET_FUTURE_SCALE_NOxbf
@@ -1199,10 +1219,14 @@
       !=================================================================
 
       ! Weekday biofuel file name
+#if defined( MODELE )
+      FILENAME = TRIM( DATA_DIR_1x1 )                     // 
+     &           'EPA_NEI_200411/wkday_avg_bf.YYYYMM.geos.1x1'
+#else
       FILENAME = TRIM( DATA_DIR )                         // 
      &           'EPA_NEI_200411/wkday_avg_bf.YYYYMM.'    //
      &           GET_NAME_EXT_2D() // '.' // GET_RES_EXT()
-
+#endif
       ! Replace date in filename
       CALL EXPAND_DATE( FILENAME, YYYYMMDD, 000000 )
 
@@ -1231,9 +1255,14 @@
       !=================================================================
 
       ! Weekend biofuel file name
+#if defined( MODELE )
+      FILENAME = TRIM( DATA_DIR_1x1 )                     //
+     &           'EPA_NEI_200411/wkend_avg_bf.YYYYMM.geos.1x1'
+#else
       FILENAME = TRIM( DATA_DIR )                         // 
      &           'EPA_NEI_200411/wkend_avg_bf.YYYYMM.'    //
      &           GET_NAME_EXT_2D() // '.' // GET_RES_EXT()  
+#endif
 
       ! Replace date in filename
       CALL EXPAND_DATE( FILENAME, YYYYMMDD, 000000 )
@@ -1365,9 +1394,12 @@
 !
 ! !USES:
 !
+      USE REGRID_A2A_MOD
       USE BPCH2_MOD,        ONLY : OPEN_BPCH2_FOR_READ
+      USE ERROR_MOD,        ONLY : GEOS_CHEM_STOP
       USE FILE_MOD,         ONLY : IOERROR
       USE inquireMod,       ONLY : findFreeLUN
+      USE DIRECTORY_MOD,    ONLY : DATA_DIR_1x1
       USE TRANSFER_MOD,     ONLY : TRANSFER_2D
       USE SCALE_ANTHRO_MOD, ONLY : GET_ANNUAL_SCALAR
       USE TIME_MOD,         ONLY : GET_YEAR   
@@ -1420,6 +1452,17 @@
       CHARACTER(LEN=40) :: UNIT     
       CHARACTER(LEN=40) :: RESERVED
 
+#if defined( MODELE )
+      REAL*4            :: ARRAY1x1( 360, 181, 1 )
+      REAL*8            :: ARRAY1x1DBLE( 360, 181, 1 )
+
+      REAL*4            :: ARRAY2x25( 144, 91, 1 )
+      REAL*8            :: ARRAY2x25DBLE( 144, 91, 1 )
+
+      REAL*8            :: ARRAYDBLE( IIPAR, JJPAR, 1 )
+      CHARACTER(LEN=256):: LLFILENAME
+#endif
+      
       !=================================================================
       ! READ_EPA begins here!
       !=================================================================
@@ -1455,8 +1498,41 @@
          IF ( IOS /= 0 ) CALL IOERROR( IOS, IU_FILE, 'read_data:3' )
 
          ! Read data
+#if defined( MODELE )
+
+         IF ( NI .eq. 360 ) THEN
+            ! Input file is GEOS 1x1
+            READ( IU_FILE, IOSTAT=IOS ) 
+     &           ( ( ( ARRAY1x1(I,J,L), I=1,NI ), J=1,NJ ), L=1,NL )
+            LLFILENAME = TRIM( DATA_DIR_1x1) //
+     &           'MAP_A2A_Regrid_201203/latlon_geos1x1.nc'
+            ARRAY1x1DBLE = ARRAY1x1
+            CALL DO_REGRID_A2A( LLFILENAME,
+     &           NI, NJ, ARRAY1x1DBLE, ARRAYDBLE, 
+     &           IS_MASS=0, NetCDF=.TRUE. )
+
+         ELSE IF ( NI .eq. 144 ) THEN
+            ! Input file in GEOS 2x25
+            READ( IU_FILE, IOSTAT=IOS ) 
+     &           ( ( ( ARRAY2x25(I,J,L), I=1,NI ), J=1,NJ ), L=1,NL )
+            LLFILENAME = TRIM( DATA_DIR_1x1) //
+     &           'MAP_A2A_Regrid_201203/latlon_geos2x25.nc'
+            ARRAY2x25DBLE = ARRAY2x25
+            CALL DO_REGRID_A2A( LLFILENAME,
+     &                          NI, NJ, ARRAY2x25DBLE, ARRAYDBLE, 
+     &                          IS_MASS=0, NetCDF=.TRUE. )            
+
+         ELSE
+            WRITE(6,*) 'Error in EPA emissions'
+            CALL GEOS_CHEM_STOP
+
+         ENDIF
+   
+         ARRAY = ARRAYDBLE
+#else
          READ( IU_FILE, IOSTAT=IOS ) 
      &        ( ( ( ARRAY(I,J,L), I=1,NI ), J=1,NJ ), L=1,NL )
+#endif
 
          ! Error check
          IF ( IOS /= 0 ) CALL IOERROR( IOS, IU_FILE, 'read_data:4' )
@@ -1701,7 +1777,8 @@
 !
       USE BPCH2_MOD,     ONLY : GET_NAME_EXT_2D, GET_RES_EXT
       USE BPCH2_MOD,     ONLY : GET_TAU0,        READ_BPCH2
-      USE DIRECTORY_MOD, ONLY : DATA_DIR
+      USE DIRECTORY_MOD, ONLY : DATA_DIR, DATA_DIR_1x1
+      USE REGRID_A2A_MOD
       USE TRANSFER_MOD,  ONLY : TRANSFER_2D
 
       USE CMN_SIZE_MOD      ! Size parameters
@@ -1735,6 +1812,12 @@
       REAL*8             :: XTAU
       CHARACTER(LEN=255) :: FILENAME
       CHARACTER(LEN=14 ) :: MASK_DIR
+#if defined( MODELE )
+      INTEGER            :: I, J
+      CHARACTER(LEN=256) :: LLFILENAME
+      REAL*4             :: ARRAY1x1(360,181,1)
+      REAL*8             :: ARRAY1x1DBLE(360,181,1)
+#endif
 
       !=================================================================
       ! READ_USA_MASK begins here!
@@ -1755,6 +1838,39 @@
       MASK_DIR = 'EPA_NEI_200411'
 #endif
 
+# if  defined( MODELE )
+
+      FILENAME = TRIM( DATA_DIR_1x1 ) // MASK_DIR //
+     &     '/usa_mask.geos.1x1'
+
+      ! Echo info
+      WRITE( 6, 100 ) TRIM( FILENAME )
+ 100  FORMAT( '     - READ_USA_MASK: Reading ', a )
+
+      ! Get TAU0 for Jan 1985
+      XTAU  = GET_TAU0( 1, 1, 1985 )
+
+      ! USA mask is stored in the bpch file as #2
+      CALL READ_BPCH2( FILENAME, 'LANDMAP', 2, 
+     &                 XTAU,      360,      181,     
+     &                 1,         ARRAY1x1, QUIET=.TRUE. ) 
+
+      ! Regrid US map to our resolution
+      LLFILENAME = TRIM( DATA_DIR_1x1) //
+     &     'MAP_A2A_Regrid_201203/latlon_geos1x1.nc'
+      ARRAY1x1DBLE = ARRAY1x1
+      CALL DO_REGRID_A2A( LLFILENAME,
+     &     360, 181, ARRAY1x1DBLE, USA_MASK, IS_MASS=0, NetCDF=.TRUE. )
+
+      WHERE( USA_MASK /= 0d0 ) USA_MASK = 1d0
+
+      ! Plot map
+      !DO J=46,1,-1
+      !   WRITE(6,'(72I2)') USA_MASK(:,J)
+      !ENDDO
+    
+#else
+
       ! Create filename
       FILENAME = TRIM( DATA_DIR )         //
      &           MASK_DIR // '/usa_mask.' // GET_NAME_EXT_2D() //
@@ -1774,6 +1890,8 @@
 
       ! Cast to REAL*8
       CALL TRANSFER_2D( ARRAY(:,:,1), USA_MASK )
+
+#endif
 
       END SUBROUTINE READ_USA_MASK
 !EOC

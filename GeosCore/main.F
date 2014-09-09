@@ -531,15 +531,21 @@
 
       ! Initialize the derived type object containing
       ! mapping information for the MODIS LAI routines
+#if defined( MODELE )
+         ! GISS landcover maps are on BIOME4-TG grid (0.5 x 0.5 "generic")
+         CALL Init_Mapping(  720, 360, IIPAR, JJPAR, mapping )
+#else
       IF ( USE_OLSON_2001 ) THEN
          CALL Init_Mapping( 1440, 720, IIPAR, JJPAR, mapping )
       ELSE
          CALL Init_Mapping(  720, 360, IIPAR, JJPAR, mapping )
       ENDIF
+#endif
 
       ! Compute the Olson land types that occur in each grid box
       ! (i.e. this is a replacement for rdland.F and vegtype.global)
-      CALL Init_Olson_Landmap   ( am_I_Root, Input_Opt%DATA_DIR_1x1 )
+      CALL Init_Olson_Landmap   ( am_I_Root, Input_Opt%DATA_DIR_1x1, 
+     &                                                    State_Met )
       CALL Compute_Olson_Landmap( am_I_Root, mapping, State_Met     )
       CALL Cleanup_Olson_Landmap( am_I_Root                         )
 
@@ -814,8 +820,11 @@
                ! Read UV albedoes for FAST-J
                CALL READ_UVALBEDO( MONTH, State_Met )
 
+#if !defined( GISS )
                ! Read TOMS overhead O3 columns for FAST-J
                CALL READ_TOMS( MONTH, YEAR, Input_Opt%USE_O3_FROM_MET )
+#endif
+
             ENDIF
          ENDIF
 
@@ -825,7 +834,7 @@
          ! (bmy, 10/14/11)
          IF ( ITS_A_FULLCHEM_SIM .or. ITS_A_TAGCO_SIM ) THEN
             IF ( ITS_TIME_FOR_EMIS() ) THEN 
-               IF ( LEMIS .and. ITS_A_NEW_SEASON() ) THEN
+               IF ( LEMIS .and. LANTHRO .and. ITS_A_NEW_SEASON() ) THEN
                   CALL ANTHROEMS( SEASON, Input_Opt )              
                ENDIF
             ENDIF
@@ -995,8 +1004,10 @@
          ! (ccc, 12/9/08)
          CALL DIAG_2PM( State_Met )
 
+#if !defined( GISS )
          ! Get the overhead column O3 for use with FAST-J
          CALL GET_OVERHEAD_O3_FOR_FASTJ()
+#endif
 
          !==============================================================
          !   ***** U N I T   C O N V E R S I O N  ( kg -> v/v ) *****
@@ -1467,7 +1478,7 @@
          CALL UNZIP_A6_FIELDS( Input_Opt, ZTYPE )
          CALL UNZIP_I6_FIELDS( Input_Opt, ZTYPE )
 
-#if   defined( GCAP )
+#if   defined( MODELE ) || defined( GCAP )
          ! Remove GCAP PHIS field (if necessary)
          CALL UNZIP_GCAP_FIELDS( Input_Opt, ZTYPE )
 #endif
@@ -1594,6 +1605,18 @@
      &    '   S T A R T I N G  0.25 x 0.3125  G E O S -- C H E M   ' //
      &    REPEAT( '*', 13 )
 
+#elif defined( GRIDM23   )
+      WRITE( 6, '(a)' )                   
+     &    REPEAT( '*', 13 )                                          //
+     &    '   S T A R T I N G  GISS Model E M23   G E O S--C H E M ' //
+     &    REPEAT( '*', 13 )
+
+#elif defined( GRIDF40   )
+      WRITE( 6, '(a)' )                   
+     &    REPEAT( '*', 13 )                                          //
+     &    '   S T A R T I N G  GISS Model E F40   G E O S--C H E M ' //
+     &    REPEAT( '*', 13 )
+
 #endif
 
       !-------------------------------------------------
@@ -1629,6 +1652,8 @@
       WRITE( 6, '(a)' ) 'Using GMAO MERRA met fields'
 #elif defined( GCAP  )
       WRITE( 6, '(a)' ) 'Using GCAP/GISS met fields'
+#elif defined( MODELE  )
+      WRITE( 6, '(a)' ) 'Using ModelE met fields'
 #endif
 
       !-------------------------------------------------
@@ -1845,7 +1870,7 @@
          CALL UNZIP_A6_FIELDS( Input_Opt, ZTYPE )
          CALL UNZIP_I6_FIELDS( Input_Opt, ZTYPE )
 
-#if   defined( GCAP )
+#if   defined( MODELE ) || defined( GCAP )
          ! Unzip GCAP PHIS field (if necessary)
          CALL UNZIP_GCAP_FIELDS( Input_Opt, ZTYPE )
 #endif
@@ -1862,7 +1887,7 @@
          CALL UNZIP_A6_FIELDS( Input_Opt, ZTYPE, NYMDb )
          CALL UNZIP_I6_FIELDS( Input_Opt, ZTYPE, NYMDb )
 
-#if   defined( GCAP )
+#if   defined( MODELE ) || defined( GCAP )
          ! Unzip GCAP PHIS field (if necessary)
          CALL UNZIP_GCAP_FIELDS( Input_Opt, ZTYPE )
 #endif
@@ -1902,7 +1927,7 @@
       CALL GET_I6_FIELDS_1( DATE(1), DATE(2), State_Met )
       IF ( LPRT ) CALL DEBUG_MSG( '### MAIN: a 1st I6 TIME' )
     
-#if   defined( GCAP )
+#if   defined( MODELE ) || defined( GCAP )
 
       !-----------------------------------------------------------------
       ! Read additional fields for GCAP meteorology

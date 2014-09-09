@@ -96,6 +96,7 @@
 ! !USES:
 !
       USE BPCH2_MOD,    ONLY : BPCH2, GET_MODELNAME, GET_HALFPOLAR
+      USE BPCH2_MOD,    ONLY : GET_CENTER180
       USE FILE_MOD,     ONLY : IU_BPCH
       USE GRID_MOD,     ONLY : GET_XOFFSET, GET_YOFFSET
       USE TIME_MOD,     ONLY : GET_CT_A6, GET_CT_A3, GET_CT_I3
@@ -140,7 +141,7 @@
       IF ( ND56 == 0 ) RETURN
 
       ! Initialize
-      CENTER180 = 1
+      CENTER180 = GET_CENTER180()
       DIAGb     = GET_DIAGb()
       DIAGe     = GET_DIAGe()
       HALFPOLAR = GET_HALFPOLAR()

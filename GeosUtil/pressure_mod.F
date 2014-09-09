@@ -30,6 +30,7 @@
       PUBLIC  :: GET_PEDGE_FULLGRID
       PUBLIC  :: INIT_PRESSURE
       PUBLIC  :: SET_FLOATING_PRESSURE
+      PUBLIC  :: SIGE, SIG, DSIG, byDSIG
 #if defined( ESMF_ )
       PUBLIC  :: Accept_External_Pedge
 #endif
@@ -101,6 +102,7 @@
 !                              EXTERNAL_PEDGE from the ESMF environment
 !  20 Aug 2013 - R. Yantosca - Removed "define.h", this is now obsolete
 !  18 Sep 2013 - M. Long     - Now use #if defined( ESMF_ ) for HPC code
+!  06 Jul 2014 - L. Murray   - Add GISS M23 and F40 resolutions
 !EOP
 !------------------------------------------------------------------------------
 !BOC
@@ -113,6 +115,9 @@
       REAL*8, ALLOCATABLE :: PFLT(:,:)              ! "Floating" sfc pressure
       REAL*8, ALLOCATABLE :: AP_FULLGRID(:)         ! "A" term for full grid
       REAL*8, ALLOCATABLE :: BP_FULLGRID(:)         ! "B" term for full grid
+      REAL*8, ALLOCATABLE :: SIG(:), SIGE(:)
+      REAL*8, ALLOCATABLE :: DSIG(:)
+      REAL*8, ALLOCATABLE :: BYDSIG(:)
 #if defined( ESMF_ )
       REAL*8, ALLOCATABLE :: EXTERNAL_PEDGE(:,:,:)  ! Pressure edges from 
                                                     !  external grid
@@ -331,6 +336,23 @@
       PEDGE = AP(L) + ( BP(L) * PFLT(I,J) )
 #endif
 
+#elif defined( MODELE )
+
+      !-----------------------------
+      ! GISS met fields
+      !-----------------------------
+!#if defined( ESMF_ )
+!      ! Pressure [hPa] at bottom edge of level L (see documentation header)
+!      ! Taken from the GCM fields
+!      PEDGE = EXTERNAL_PEDGE(I,J,L)
+!#else
+      IF ( L .ge. LS1 ) THEN
+         PEDGE = SIGE(L) * PSFMPT + PTOP
+      ELSE
+         PEDGE = SIGE(L) * (PFLT(I,J)-PTOP) + PTOP
+      ENDIF
+!#endif
+
 #else 
 
       !-----------------------------
@@ -400,6 +422,17 @@
 
       ! Pressure [hPa] at bottom edge of level L (see documentation header)
       PEDGE = AP_FULLGRID(L) + ( BP_FULLGRID(L) * PFLT(I,J) )
+
+#elif defined( MODELE )
+
+      !-----------------------------
+      ! GISS met fields
+      !-----------------------------
+      IF ( L .ge. LS1 ) THEN
+         PEDGE = SIGE(L) * PSFMPT + PTOP
+      ELSE
+         PEDGE = SIGE(L) * (PFLT(I,J)-PTOP) + PTOP
+      ENDIF
 
 #else 
 
@@ -510,6 +543,7 @@
 !  30 Jul 2012 - R. Yantosca - Now accept am_I_Root as an argument when
 !                              running with the traditional driver main.F
 !  26 Sep 2013 - R. Yantosca - Renamed GEOS_57 Cpp switch to GEOS_FP
+!  06 Jul 2014 - L. Murray   - Add GISS pressure calculation; correct GCAP
 !EOP
 !------------------------------------------------------------------------------
 !BOC
@@ -518,9 +552,6 @@
 !
       INTEGER :: AS
       INTEGER :: L
-
-      ! Temporary array for GCAP met fields (swu, bmy, 5/24/05)
-      REAL*8  :: SIGE_GCAP(LLPAR+1)  
 
       !=================================================================
       ! INIT_PRESSURE begins here!
@@ -855,7 +886,7 @@
       !=================================================================
 
       ! Define SIGMA edges from GISS 23L model
-      SIGE_GCAP = (/ 1.0d0,           0.9712230d0,     0.9340528d0,     
+      SIGE      = (/ 1.0d0,           0.9712230d0,     0.9340528d0,     
      &               0.8800959d0,     0.8021583d0,     0.6714628d0, 
      &               0.5035971403d0,  0.3297362030d0,  0.1966426820d0,  
      &               0.1139088720d0,  0.0503597111d0,  0.0000000000d0, 
@@ -865,19 +896,134 @@
      &              -0.1796822548d0, -0.1798187047d0, -0.1798536479d0 /)
 
       ! Convert SIGMA to AP and BP coordinates
-      DO  L = 1, LLCHEM
-         AP(L) = 150d0 + ( SIGE_GCAP(L) * ( PTOP - 150d0 ) )
-         BP(L) = SIGE_GCAP(L)
+      DO  L = 1, LLTROP
+         AP(L) = 150d0 + ( SIGE(L) * ( PTOP - 150d0 ) )
+         BP(L) = SIGE(L)
       ENDDO
 
-      DO L = LLCHEM+1, LLPAR+1  
-         AP(L) = 150d0 + ( SIGE_GCAP(L) * ( 984d0 - 150d0 ) )
+      DO L = LLTROP+1, LLPAR+1  
+         AP(L) = 150d0 + ( SIGE(L) * ( 984d0 - 150d0 ) )
          BP(L) = 0d0
       ENDDO
 
       AP_FULLGRID = AP
       BP_FULLGRID = BP
 
+#elif defined( MODELE )
+
+      ALLOCATE( SIGE( LLPAR+1 ), STAT=AS )
+      IF ( AS /= 0 ) CALL ALLOC_ERR( 'SIGE' )
+      SIGE = 0d0
+
+      ALLOCATE( SIG( LLPAR+1 ), STAT=AS )
+      IF ( AS /= 0 ) CALL ALLOC_ERR( 'SIG' )
+      SIG = 0d0
+
+      ALLOCATE( DSIG( LLPAR ), STAT=AS )
+      IF ( AS /= 0 ) CALL ALLOC_ERR( 'DSIG' )
+      DSIG = 0d0
+
+      ALLOCATE( byDSIG( LLPAR ), STAT=AS )
+      IF ( AS /= 0 ) CALL ALLOC_ERR( 'byDSIG' )
+      byDSIG = 0d0
+
+#if defined( GRIDM23 )
+
+      !=================================================================
+      ! GISS M23 vertical coordinates (from RES_M23.F)
+      !=================================================================
+      
+      ! From RES_M23.f of Model E
+      !@var PLbot pressure levels at bottom of layers (mb)
+!      REAL*8, PARAMETER, DIMENSION(LM+1) :: PLbot = (/
+!     t     PSF,   960.d0,  929.d0,  884.d0,  819.d0,    ! Pbot L=1,5
+!     t  710.d0,   570.d0,  425.d0,  314.d0,  245.d0,    !      L=6,10
+!     t  192.d0,                                         !      L=11
+!     1    PTOP,                                         !      L=LS1
+!     s  117.d0,   86.2d0,  56.2d0,  31.6d0,  17.8d0,    !      L=13-17
+!     s  10.0d0,   4.63d0,  1.46d0,  0.460995258d0,      !      L=18-21
+!     s  0.1449994968d0,    3.12002802d-2,    PMTOP /)   !      L=..,LM+1
+
+      ! Define SIGMA edges from GISS 23L model for GEOS-Chem compatability
+      SIGE = (/ 1.0d0,           0.9712230d0,     0.9340528d0,     
+     &          0.8800959d0,     0.8021583d0,     0.6714628d0, 
+     &          0.5035971403d0,  0.3297362030d0,  0.1966426820d0,  
+     &          0.1139088720d0,  0.0503597111d0,  0.0000000000d0, 
+     &         -0.0395683460d0, -0.0764988065d0, -0.1124700233d0, 
+     &         -0.1419664323d0, -0.1585131884d0, -0.1678657085d0, 
+     &         -0.1743045598d0, -0.1781055182d0, -0.1793033630d0, 
+     &         -0.1796822548d0, -0.1798187047d0, -0.1798536479d0 /)
+ 
+      DO L=1,LLPAR
+         SIG(L)  = 0.5d0 * ( SIGE(L) + SIGE(L+1) )
+         dSIG(L) = SIGE(L) - SIGE(L+1)
+      ENDDO
+      byDSIG = 1d0/DSIG 
+
+      Bp = 0d0
+      Ap = PTOP
+      Bp(1:LS1) = SIGE(1:LS1)
+      Ap(LS1:(LLPAR+1)) = (/ 150d0, 117d0, 86.2d0, 56.2d0, 31.6d0, 
+     &                       17.8d0, 10d0, 4.6d0, 1.46d0, 0.460995258d0,
+     &                       0.144999497d0, 3.12d-02, 2.0576514d-3 /)
+ 
+      AP_FULLGRID = AP
+      BP_FULLGRID = BP
+
+#elif defined( GRIDF40 )
+
+      !=================================================================
+      ! GISS F40 vertical coordinates (from RES_F40.F)
+      !=================================================================
+      
+      ! From RES_F40.f of ModelE
+      !@var PTOP pressure at interface level sigma/const press coord syst (mb)
+!      REAL*8, PARAMETER :: PSF=984.d0, PTOP = 150.d0, PMTOP = .1d0
+      !@var PLbot pressure levels at bottom of layers (mb)
+!      REAL*8, PARAMETER, DIMENSION(LM+1) :: PLbot = (/
+!     *     PSF,   964d0, 942d0, 917d0, 890d0, 860d0, 825d0, ! Pbot L=1,..   
+!     *     785d0, 740d0, 692d0, 642d0, 591d0, 539d0, 489d0, !      L=...    
+!     *     441d0, 396d0, 354d0, 316d0, 282d0, 251d0, 223d0,  
+!     *     197d0, 173d0,                                    
+!     *     PTOP,                                            !      L=LS1    
+!     *     128d0, 108d0,  90d0,  73d0,  57d0,  43d0,  31d0, !      L=...    
+!     *     20d0,   10d0,  5.62d0,  3.16d0,  1.78d0,   1.d0, 
+!     *     .562d0,  .316d0,  .178d0,  PMTOP /)              !      L=..,LM+1
+
+      ! SIGE(:) = (PLbot(:)-PTOP)/PSFMPT
+      SIGE = (/ 1.00000000000d0, 0.97601918465d0, 0.94964028777d0, 
+     &          0.91966426859d0, 0.88729016787d0, 0.85131894484d0,
+     &          0.80935251799d0, 0.76139088729d0, 0.70743405276d0,
+     &          0.64988009592d0, 0.58992805755d0, 0.52877697842d0,
+     &          0.46642685851d0, 0.40647482014d0, 0.34892086331d0, 
+     &          0.29496402878d0, 0.24460431655d0, 0.19904076739d0,
+     &          0.15827338129d0, 0.12110311751d0, 0.08752997602d0,
+     &          0.05635491607d0, 0.02757793765d0, 0.00000000000d0,
+     &         -0.02637889688d0,-0.05035971223d0,-0.07194244604d0,
+     &         -0.09232613909d0,-0.11151079137d0,-0.12829736211d0,
+     &         -0.14268585132d0,-0.15587529976d0,-0.16786570743d0,
+     &         -0.17311750600d0,-0.17606714628d0,-0.17772182254d0,
+     &         -0.17865707434d0,-0.17918225420d0,-0.17947721823d0,
+     &         -0.17964268585d0,-0.17973621103d0                   )
+ 
+      DO L=1,LLPAR
+         SIG(L)  = 0.5d0 * ( SIGE(L) + SIGE(L+1) )
+         dSIG(L) = SIGE(L) - SIGE(L+1)
+      ENDDO
+      byDSIG = 1d0/DSIG 
+
+      Bp = 0d0
+      Ap = PTOP
+      Bp(1:LS1) = SIGE(1:LS1)
+      Ap(LS1:(LLPAR+1)) = (/ 128d0, 108d0, 90d0, 73d0, 57d0, 43d0, 
+     &     31d0, 20d0, 10d0, 5.62d0, 3.16d0, 1.78d0, 1.d0,0.562d0, 
+     &     0.316d0, 0.178d0, 0.1d0 /)
+ 
+      AP_FULLGRID = AP
+      BP_FULLGRID = BP
+
+#endif
+      
 #endif
       
 #if !defined( ESMF_ ) 
@@ -921,6 +1067,10 @@
       IF ( ALLOCATED( AP_FULLGRID ) ) DEALLOCATE( AP_FULLGRID )
       IF ( ALLOCATED( BP_FULLGRID ) ) DEALLOCATE( BP_FULLGRID )
       IF ( ALLOCATED( PFLT        ) ) DEALLOCATE( PFLT        )
+      IF ( ALLOCATED( SIGE        ) ) DEALLOCATE( SIGE )
+      IF ( ALLOCATED( SIG         ) ) DEALLOCATE( SIG  )
+      IF ( ALLOCATED( DSIG        ) ) DEALLOCATE( DSIG )
+      IF ( ALLOCATED( byDSIG      ) ) DEALLOCATE( byDSIG )
 #if defined( ESMF_ )
       IF ( ALLOCATED( EXTERNAL_PEDGE ) ) DEALLOCATE( EXTERNAL_PEDGE )
 #endif

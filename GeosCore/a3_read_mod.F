@@ -1,5 +1,5 @@
 !------------------------------------------------------------------------------
-!                  GEOS-Chem Global Chemical Transport Model                  !
+!                  GEOS-Chem Global Chemical Transport Model                 !
 !------------------------------------------------------------------------------
 !BOP
 !
@@ -77,7 +77,7 @@
       CONTAINS
 !EOC
 !------------------------------------------------------------------------------
-!                  GEOS-Chem Global Chemical Transport Model                  !
+!                  GEOS-Chem Global Chemical Transport Model                 !
 !------------------------------------------------------------------------------
 !BOP
 !
@@ -148,10 +148,10 @@
          GEOS_DIR = TRIM( Input_Opt%GEOS_5_DIR )
          A3_STR   = 'YYYYMMDD.a3.' // GET_RES_EXT()
 
-#elif defined( GCAP )
+#elif defined( MODELE ) || defined( GCAP )
 
          ! Strings for directory & filename
-         GEOS_DIR = TRIM( Input_Opt%GCAP_DIR )
+         GEOS_DIR = TRIM( Input_Opt%GISS_DIR )
          A3_STR   = 'YYYYMMDD.a3.' // GET_RES_EXT()
 
 #endif
@@ -238,7 +238,7 @@
       END SUBROUTINE UNZIP_A3_FIELDS
 !EOC
 !------------------------------------------------------------------------------
-!                  GEOS-Chem Global Chemical Transport Model                  !
+!                  GEOS-Chem Global Chemical Transport Model                 !
 !------------------------------------------------------------------------------
 !BOP
 !
@@ -314,7 +314,7 @@
       END FUNCTION DO_OPEN_A3
 !EOC
 !------------------------------------------------------------------------------
-!                  GEOS-Chem Global Chemical Transport Model                  !
+!                  GEOS-Chem Global Chemical Transport Model                 !
 !------------------------------------------------------------------------------
 !BOP
 !
@@ -410,10 +410,10 @@
          GEOS_DIR = TRIM( Input_Opt%GEOS_5_DIR )
          A3_FILE  = 'YYYYMMDD.a3.' // GET_RES_EXT()
 
-#elif defined( GCAP )
+#elif defined( MODELE ) || defined( GCAP )
 
          ! Strings for directory & filename
-         GEOS_DIR = TRIM( Input_Opt%GCAP_DIR )
+         GEOS_DIR = TRIM( Input_Opt%GISS_DIR )
          A3_FILE  = 'YYYYMMDD.a3.' // GET_RES_EXT()
 
 #endif
@@ -480,7 +480,7 @@
       END SUBROUTINE OPEN_A3_FIELDS
 !EOC
 !------------------------------------------------------------------------------
-!                  GEOS-Chem Global Chemical Transport Model                  !
+!                  GEOS-Chem Global Chemical Transport Model                 !
 !------------------------------------------------------------------------------
 !BOP
 !
@@ -633,10 +633,10 @@
      &              FRLAKE   = State_Met%FRLAKE,     
      &              FRLANDIC = State_Met%FRLANDIC )
 
-#elif defined( GCAP )
+#elif defined( MODELE ) || defined( GCAP )
 
       !================================================================
-      ! For GCAP, read the following fields:
+      ! For GISS-driven simulations, read the following fields:
       !
       !    ALBEDO, GETWETTOP, MOLENGTH, OICE,  PARDF, PARDR, PBL,
       !    PREACC, PRECON,    RADSWG,   SNICE, SNOW,  TS,    U10M,  
@@ -666,6 +666,11 @@
       ! Convert [m] to [mm]
       State_Met%SNOW = State_Met%SNOW*1000.D0
 
+      ! Make TSKIN = TS for now; consider replacing with monthly mean SST
+      ! instead. For full chemistry, this is only used in the sea salt evasion
+      ! code (ltm)
+      State_Met%TSKIN = State_Met%TS
+
 #endif
 
       ! Save NYMD, NHMS for next call
@@ -675,7 +680,7 @@
       END SUBROUTINE GET_A3_FIELDS
 !EOC
 !------------------------------------------------------------------------------
-!                  GEOS-Chem Global Chemical Transport Model                  !
+!                  GEOS-Chem Global Chemical Transport Model                 !
 !------------------------------------------------------------------------------
 !BOP
 !
@@ -731,9 +736,9 @@
       ! GEOS-5 has 33 A-3 fields (only 30 used in GEOS-Chem)
       N_A3 = 33
 
-#elif defined( GCAP )
+#elif defined( MODELE ) || defined( GCAP )
       
-      ! GCAP has 16 fields
+      ! GISS/GCAP has 16 fields
       N_A3 = 16
 
 #endif
@@ -741,7 +746,7 @@
       END FUNCTION GET_N_A3
 !EOC
 !------------------------------------------------------------------------------
-!                  GEOS-Chem Global Chemical Transport Model                  !
+!                  GEOS-Chem Global Chemical Transport Model                 !
 !------------------------------------------------------------------------------
 !BOP
 !
@@ -790,7 +795,7 @@
       END FUNCTION CHECK_TIME
 !EOC
 !------------------------------------------------------------------------------
-!                  GEOS-Chem Global Chemical Transport Model                  !
+!                  GEOS-Chem Global Chemical Transport Model                 !
 !------------------------------------------------------------------------------
 !BOP
 !
@@ -1553,7 +1558,7 @@
       END SUBROUTINE READ_A3
 !EOC
 !------------------------------------------------------------------------------
-!                  GEOS-Chem Global Chemical Transport Model                  !
+!                  GEOS-Chem Global Chemical Transport Model                 !
 !------------------------------------------------------------------------------
 !BOP
 !
@@ -1607,7 +1612,7 @@
       END SUBROUTINE ARCHIVE_ND67_1D
 !EOC
 !------------------------------------------------------------------------------
-!                  GEOS-Chem Global Chemical Transport Model                  !
+!                  GEOS-Chem Global Chemical Transport Model                 !
 !------------------------------------------------------------------------------
 !BOP
 !

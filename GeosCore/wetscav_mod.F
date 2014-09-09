@@ -313,6 +313,24 @@
       CALL WETDEP(  State_Met, State_Chm, LS=.TRUE. )
       IF ( doPrt ) CALL DEBUG_MSG( '### DO_WETDEP: after LS wetdep' )
 
+#elif defined( MODELE ) || defined( GCAP )
+
+      !=================================================================
+      ! GISS: Only do wet deposition for large-scale + anvil precip
+      !=================================================================
+
+      !---------------------
+      ! Large-scale precip
+      !---------------------
+
+      ! Create precip fields
+      CALL MAKE_QQ( State_Met, LS=.TRUE. )
+      IF ( LPRT ) CALL DEBUG_MSG( '### DO_WETDEP: before LS wetdep' )
+
+      ! Do wet deposition
+      CALL WETDEP(  State_Met, State_Chm, LS=.TRUE. )
+      IF ( LPRT ) CALL DEBUG_MSG( '### DO_WETDEP: after LS wetdep' )
+
 #else
 
       !=================================================================

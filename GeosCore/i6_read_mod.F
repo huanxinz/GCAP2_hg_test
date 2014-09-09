@@ -144,10 +144,10 @@
          GEOS_DIR = TRIM( Input_Opt%GEOS_5_DIR )
          I6_STR   = 'YYYYMMDD.i6.' // GET_RES_EXT() 
 
-#elif defined( GCAP )
+#elif defined( MODELE ) || defined( GCAP )
 
          ! Strings for directory & filename
-         GEOS_DIR = TRIM( Input_Opt%GCAP_DIR )
+         GEOS_DIR = TRIM( Input_Opt%GISS_DIR )
          I6_STR   = 'YYYYMMDD.i6.' // GET_RES_EXT() 
 
 #endif
@@ -317,10 +317,10 @@
          GEOS_DIR = TRIM( Input_Opt%GEOS_5_DIR )
          I6_FILE  = 'YYYYMMDD.i6.' // GET_RES_EXT()
 
-#elif defined( GCAP )
+#elif defined( MODELE ) || defined( GCAP )
 
          ! Strings for directory & filename
-         GEOS_DIR = TRIM( Input_Opt%GCAP_DIR )
+         GEOS_DIR = TRIM( Input_Opt%GISS_DIR )
          I6_FILE  = 'YYYYMMDD.i6.' // GET_RES_EXT()
 
 #endif
@@ -515,7 +515,7 @@
      &              TO3  = State_Met%TO31, 
      &              TTO3 = State_Met%TTO3 )
 
-#elif defined( GCAP )
+#elif defined( MODELE ) || defined( GCAP )
 
       !=================================================================
       ! GCAP: read PS1, SLP
@@ -600,7 +600,7 @@
      &              TO3  = State_Met%TO32, 
      &              TTO3 = State_Met%TTO3 )
 
-#elif defined( GCAP )
+#elif defined( MODELE ) || defined( GCAP )
 
       !=================================================================
       ! GCAP: read PS1, SLP
@@ -663,7 +663,7 @@
       ! GEOS-5 has 5 I-6 fields
       N_I6 = 5
 
-#elif defined( GCAP )
+#elif defined( MODELE ) || defined( GCAP )
 
       ! GCAP has 2 I-6 fields
       N_I6 = 2 

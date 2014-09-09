@@ -101,12 +101,40 @@
          SELECT CASE ( THISYEAR )
 
             ! Preindustrial years
-            CASE ( :1750 )
-               A3090S = 700.0d0
-               A0030S = 700.0d0
-               A0030N = 700.0d0
-               A3090N = 700.0d0
-               
+!            CASE ( :1750 )
+!               A3090S = 700.0d0
+!               A0030S = 700.0d0
+!               A0030N = 700.0d0
+!               A3090N = 700.0d0
+ 
+            ! 1770 Values from Etheridge et al., 2002
+            ! NOAA/NGDC Paleoclimatology Program
+            CASE( :1770 )
+               A3090S = 707.40d0
+               A0030S = 725.00d0
+               A0030N = 725.00d0
+               A3090N = 759.60d0     
+
+            ! Dummy Years for ModelE Paleo Climate Scenarios
+#if defined( ICECAP )
+
+            ! Pre-Industrial Holecene
+            CASE( 2100, 2101, 2102, 2103, 2104, 2105 )
+               A3090S = 707.40d0
+               A0030S = 725.00d0
+               A0030N = 725.00d0
+               A3090N = 759.60d0               
+
+            ! Last Glacial Maximum (Webb and CLIMAP and Scenarios)
+            CASE( 2200, 2201, 2202, 2203, 2204, 2205,
+     &            2300, 2301, 2302, 2303, 2304, 2305  )
+               A3090S = 370.83d0
+               A0030S = 754.50d0
+               A0030N = 754.50d0
+               A3090N = 375.29d0
+
+#else
+              
             ! Modern-day years ...
             CASE( 1983 )
                A3090S = 1583.48d0
@@ -331,6 +359,8 @@
                A0030S = 1741.68d0
                A0030N = 1801.38d0
                A3090N = 1855.55d0
+
+#endif
 
          END SELECT
 

@@ -1453,7 +1453,9 @@
 
 #if defined( GRID2x25 )
 110   FORMAT(91E10.3)
-#elif defined( GRID4x5 )
+#elif defined( GRIDF40 )
+110   FORMAT(90E10.3)
+#elif defined( GRID4x5 ) || defined( GRIDM23 )
 110   FORMAT(46E10.3)
 #elif defined( GRID05x0666 )   && defined( NESTED_CH )
 110   FORMAT(133E10.3)
@@ -1713,7 +1715,9 @@
 
 #if defined( GRID2x25 )
 110   FORMAT(91E10.3)
-#elif defined( GRID4x5 )
+#elif defined( GRIDF40 )
+110   FORMAT(90E10.3)
+#elif defined( GRID4x5 ) || defined( GRIDM23 )
 110   FORMAT(46E10.3)
 #elif defined( GRID05x0666 )   && defined( NESTED_CH )
 110   FORMAT(133E10.3)
@@ -1946,6 +1950,7 @@
       USE GIGC_Input_Opt_Mod, ONLY : OptInput
       USE TRACERID_MOD,       ONLY : IDTHCFCX
       USE GRID_MOD,           ONLY : GET_YMID
+      USE TIME_MOD,           ONLY : GET_YEAR
 !
 ! !INPUT PARAMETERS:
 !
@@ -4700,7 +4705,8 @@
       ENDIF
 
       ! Velocities should be of the order of 0.1 m/s
-      IF (VEL.gt.10.d0) THEN
+      IF (VEL.gt.1000.d0) THEN
+         print*,VEL
          CALL ERROR_STOP(' Excessive fall velocity? ', 
      &                   ' CALC_FALLVEL, UCX_mod')
       ENDIF
@@ -5779,10 +5785,55 @@
 
       ! Local variables for quantities from Input_Opt
       LOGICAL :: LFUTURE
+      INTEGER :: THISYEAR
 
       !=================================================================
       ! GET_UCX_CH4 begins here!
       !=================================================================
+
+#if defined( ICECAP )
+
+      THISYEAR = GET_YEAR()
+      SELECT CASE ( THISYEAR )
+   
+        ! Pre-Industrial Holecene
+        CASE( 2100, 2101, 2102, 2103, 2104, 2105 )
+           MR90S = 707.40d-9
+           MR30S = 725.00d-9
+           MR30N = 725.00d-9
+           MR90N = 759.60d-9              
+
+       ! Last Glacial Maximum (Webb and CLIMAP and Scenarios)
+         CASE( 2200, 2201, 2202, 2203, 2204, 2205,
+     &         2300, 2301, 2302, 2303, 2304, 2305  )
+           MR90S = 370.83d-9
+           MR30S = 380.00d-9
+           MR30N = 380.00d-9
+           MR90N = 375.29d-9
+      
+         ! Use Late Holocene / Pre-Industrial as default
+         CASE DEFAULT
+           MR90S = 707.40d-9
+           MR30S = 725.00d-9
+           MR30N = 725.00d-9
+           MR90N = 759.60d-9              
+            
+      END SELECT
+      CH4_SCALE = 1d0
+
+      IF ( am_I_Root ) THEN
+         WRITE( 6, '(a)' ) REPEAT( '=', 79 )
+         WRITE( 6, 105   ) THISYEAR
+ 105     FORMAT( 'GET_UCX_CH4: ICECAP DUMMY YEAR = ', i4 )
+
+         WRITE( 6, 110 ) MR90N*1d9, MR30N*1d9, MR30S*1d9, MR90S*1d9
+ 110     FORMAT( 'CH4 (90N - 30N) : ', f7.1, ' [ppbv]', /,
+     &           'CH4 (30N - 00 ) : ', f7.1, ' [ppbv]', /,
+     &           'CH4 (00  - 30S) : ', f7.1, ' [ppbv]', /,
+     &           'CH4 (30S - 90S) : ', f7.1, ' [ppbv]' )
+      ENDIF
+
+#else
 
       ! Copy fields from INPUT_OPT
       LFUTURE = Input_Opt%LFUTURE
@@ -5840,6 +5891,8 @@
          MR30N = LAST_MR(3)
          MR90N = LAST_MR(4)
       ENDIF
+
+#endif
 
       END SUBROUTINE GET_UCX_CH4
 !EOC
@@ -5950,16 +6003,16 @@
      &              LSETBRSTRAT .or. LSETNOYSTRAT .or. LSETN2O    .or.
      &              LBASICEMIS  )
 
-#if !defined(GRID4x5) && !defined(GRID2x25)
+#if !defined(GRID4x5) && !defined(GRID2x25) && !defined(GRIDM23) && !defined(GRIDF40)
       IF ( LUCX .and. USE2DDATA ) THEN
        DBGMSG = 'Zonal means preprocessed only for 2x2.5 and 4x5 grid.'
        CALL ERROR_STOP( DBGMSG, 'INIT_UCX (UCX_mod.f)!' )
       ELSE
        AVG_FILE_ROOT = ''
       ENDIF
-#elif defined(GRID2x25)
+#elif defined(GRID2x25) || defined( GRIDF40 )
       GRIDSPEC = 'Grid2x25/InitCFC_'
-#elif defined(GRID4x5)
+#elif defined(GRID4x5) || defined( GRIDM23 )
       GRIDSPEC = 'Grid4x5/InitCFC_'
 #else
       GRIDSPEC = ''

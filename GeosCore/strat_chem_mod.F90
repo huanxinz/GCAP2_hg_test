@@ -341,7 +341,7 @@ CONTAINS
 
        ! Read rates for this month
        IF ( IT_IS_A_FULLCHEM_SIM ) THEN
-#if defined( GRID4x5 ) || defined( GRID2x25 )
+#if defined( GRID4x5 ) || defined( GRID2x25 ) || defined( GRIDM23 ) || defined( GRIDF40 )
           CALL GET_RATES( GET_MONTH(), Input_Opt, State_Chm,  &
                                        am_I_Root, errCode    )
 #else
@@ -714,7 +714,7 @@ CONTAINS
     USE GIGC_ErrCode_Mod
     USE GIGC_Input_Opt_Mod, ONLY : OptInput
     USE GIGC_State_Chm_Mod, ONLY : ChmState
-    USE TIME_MOD,           ONLY : GET_MONTH
+    USE TIME_MOD,           ONLY : GET_MONTH,  GET_YEAR
     USE TRANSFER_MOD,       ONLY : TRANSFER_3D
 
     ! netCDF routines
@@ -761,6 +761,7 @@ CONTAINS
     INTEGER            :: F,        NN,      fileID
     REAL*8             :: XTAU
     INTEGER            :: N_TRACERS
+    INTEGER            :: THISYEAR
 
     ! Arrays
     INTEGER            :: st4d(4)                        ! netCDF start
@@ -770,6 +771,10 @@ CONTAINS
 
     ! Pointers
     REAL*4,  POINTER   :: ptr_3D(:,:,:)
+
+#if defined( ICECAP )
+    REAL*8             :: N2Oscale, CH4scale, OHscale, Bryscale
+#endif
 
     !=================================================================
     ! GET_RATES begins here
@@ -799,6 +804,34 @@ CONTAINS
     ! Current practice in the standard GEOS-Chem is to read strat chem
     ! prod/loss data from netCDF files. (bmy, 10/26/12)
     !----------------------------------------------------------------------
+
+
+#if defined( ICECAP )
+
+    ! Over GMI period (2004-2010): 
+    ! Mean N2O is ~321 ppb
+    ! Mean CH4 is ~1770 ppb
+
+    THISYEAR = GET_YEAR()
+    SELECT CASE ( THISYEAR )
+    CASE( 2200:2399 )
+       N2Oscale = 247.50d0 /  321d0
+       CH4scale = 563.78d0 / 1770d0
+       OHscale  = 1d0
+       Bryscale = 1d0
+    CASE( 2100:2199 )
+       N2Oscale =  265.0d0 /  321d0 ! [Fluckiger et al., 2002]
+       CH4scale = 729.25d0 / 1770d0
+       OHscale  = 1d0
+       Bryscale = 1d0
+    CASE DEFAULT
+       N2Oscale = 1d0
+       CH4scale = 1d0
+       OHscale  = 1d0
+       Bryscale = 1d0
+    END SELECT
+
+#endif
 
     ! Copy fields from Input_Opt to Llocal variables
     N_TRACERS                = Input_Opt%N_TRACERS
@@ -833,6 +866,11 @@ CONTAINS
 
     ! Resize to LLPAR
     CALL TRANSFER_3D( array, STRAT_OH )
+
+#if defined( ICECAP )
+    ! Scale paleo OH
+    STRAT_OH = STRAT_OH * OHscale
+#endif
 
     ! Loop over the # of strat chem species
     DO N = 1, NSCHEM
@@ -870,6 +908,16 @@ CONTAINS
        ! Special adjustment for G-C Br2 tracer, which is BrCl in the strat
        IF ( TRIM(TRACER_NAME(Strat_TrID_GC(N))) .eq. 'Br2' ) &
             PROD(:,:,:,N) = PROD(:,:,:,N) / 2d0
+
+#if defined( ICECAP )
+       ! Scale paleo production
+       IF ( TRIM(TRACER_NAME(Strat_TrID_GC(N))) .eq. 'NOx' ) &
+            PROD(:,:,:,N) = PROD(:,:,:,N) * N2Oscale
+       IF ( TRIM(TRACER_NAME(Strat_TrID_GC(N))) .eq. 'HNO3' ) &
+            PROD(:,:,:,N) = PROD(:,:,:,N) * N2Oscale
+       IF ( TRIM(TRACER_NAME(Strat_TrID_GC(N))) .eq. 'CO' ) &
+            PROD(:,:,:,N) = PROD(:,:,:,N) * CH4scale
+#endif
 
        !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
        ! Read loss frequencies [s^-1]
@@ -945,6 +993,13 @@ CONTAINS
        CALL TRANSFER_3D( Bry_temp(:,:,:), Bry_night(:,:,:,NN) )
        
     ENDDO
+
+#if defined( ICECAP )
+    ! Scale paleo concentrations
+    Bry_night = Bry_night * Bryscale
+    Bry_day   = Bry_day   * Bryscale
+#endif
+
 #endif
 
   END SUBROUTINE GET_RATES
@@ -1938,10 +1993,10 @@ CONTAINS
     ! GCAP has 45 latitudes, shift by 1/2 grid box (swu, bmy, 5/25/05)
     INTEGER, PARAMETER   :: J30S = 16, J30N = 30 
 
-#elif defined( GRID4x5 )
+#elif defined( GRID4x5 ) || defined( GRIDM23 )
     INTEGER, PARAMETER   :: J30S = 16, J30N = 31 
 
-#elif defined( GRID2x25 ) 
+#elif defined( GRID2x25 ) || defined( GRIDF40 )
     INTEGER, PARAMETER   :: J30S = 31, J30N = 61
 
 #elif defined( GRID1x125 ) 
@@ -2044,20 +2099,27 @@ CONTAINS
     ! For Model E, assuming 3,3,7 and 475 Tg N a-1
     PO3_vmr = 4.84610e-14 !/ 2d0
 
+#if defined( ICECAP )
+
     ! Scale as necessary for PreIndustrial and Paleo Climates
     ! These values determined by Linoz simulations run for each climate
+
+    ! These scaling factors need to be re-determined for the new
+    ! transport
     if ( GET_YEAR() .ge. 2102 .and. GET_YEAR() .le. 2105 ) then
        ! PIH was 3% higher
-       PO3_vmr = PO3_vmr * 1.0273853d0
+       PO3_vmr = PO3_vmr * 1d0 ! 1.0273853d0
     endif
     if ( GET_YEAR() .ge. 2202 .and. GET_YEAR() .le. 2205 ) then
        ! LGM Webb STE was 7% higher
-       PO3_vmr = PO3_vmr * 1.0723525d0
+       PO3_vmr = PO3_vmr * 1d0 ! 1.0723525d0
     endif
     if ( GET_YEAR() .ge. 2302 .and. GET_YEAR() .le. 2305 ) then
        ! LGM CLIMAP STE was 3% higher
-       PO3_vmr = PO3_vmr * 1.0285232d0
+       PO3_vmr = PO3_vmr * 1d0 !1.0285232d0
     endif
+
+#endif
 
 #endif
 
@@ -2288,10 +2350,10 @@ CONTAINS
     ! GCAP has 45 latitudes, shift by 1/2 grid box (swu, bmy, 5/25/05)
     INTEGER, PARAMETER   :: J30S = 16, J30N = 30 
 
-#elif defined( GRID4x5 )
+#elif defined( GRID4x5 ) || defined( GRIDM23 )
     INTEGER, PARAMETER   :: J30S = 16, J30N = 31 
 
-#elif defined( GRID2x25 ) 
+#elif defined( GRID2x25 ) || defined( GRIDF40 )
     INTEGER, PARAMETER   :: J30S = 31, J30N = 61
 
 #elif defined( GRID1x125 ) 
@@ -2368,7 +2430,7 @@ CONTAINS
     ! as GEOS-4; we can redefine later (bmy, 5/25/05)
     PO3_vmr = 5.14d-14   
 
-#elif defined( GCAP )
+#elif defined( GISS ) || defined( GCAP )
 
     ! For GCAP, assuming 3,3,7 (swu, bmy, 5/25/05)
     PO3_vmr = 5.0d-14 

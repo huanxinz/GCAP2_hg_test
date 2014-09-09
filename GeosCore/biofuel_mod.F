@@ -317,6 +317,8 @@
       CHARACTER(LEN=255)            :: ED_FILENAME
       REAL*4                        :: GENERIC_1x1(I1x1,J1x1-1)
       REAL*8, TARGET                :: GENERIC_8_1x1(I1x1,J1x1-1)
+      REAL*4                        :: GENERIC_2x25(144,91)
+      REAL*8, TARGET                :: GENERIC_8_2x25(144,91)
       REAL*8                        :: TEMP_ED(IIPAR,JJPAR,1), HIST_TAU
 !eml]
       CHARACTER(LEN=255)            :: LLFILENAME
@@ -423,9 +425,15 @@
          ! volumes throughout the year, instead of only at the
          ! first timestep (bmy, 5/3/02)
          !==============================================================
+
+#if defined( MODELE )
+         FILENAME = TRIM( DATA_DIR_1x1 )      // 
+     &              'biofuel_200202/biofuel.geos.2x25'
+#else
          FILENAME = TRIM( DATA_DIR )          // 
      &              'biofuel_200202/biofuel.' // GET_NAME_EXT_2D() // 
      &              '.'                       // GET_RES_EXT()
+#endif
 
          ! Echo filename to log file
          WRITE( 6, 110 ) TRIM( FILENAME )
@@ -483,12 +491,38 @@
 
                ELSE
 
+#if defined( MODELE )
+
+                  CALL READ_BPCH2( FILENAME, 'BIOFSRCE', 1, 
+     &                 0d0, 144, 91, 1, GENERIC_2x25, QUIET=.TRUE. )
+
+                  ! Cast from REAL*4 to REAL*8 
+                  GENERIC_8_2x25 = GENERIC_2x25
+                  
+                  ! File with lat/lon edges for regridding
+                  LLFILENAME = TRIM( DATA_DIR_1x1) //
+     &              'MAP_A2A_Regrid_201203/MAP_A2A_latlon_geos2x25.nc'
+
+                  ! Regrid to current model resolution
+                  INGRID => GENERIC_8_2x25
+                  CALL DO_REGRID_A2A( LLFILENAME,     144,        91,
+     &                                INGRID,     OUTGRID, IS_MASS=1,
+     &                                netCDF=.TRUE. )
+                  BIOFUEL_KG(N,:,:) = OUTGRID  
+                  
+                  ! Free pointer
+                  NULLIFY( INGRID )
+
+#else
+
                   CALL READ_BPCH2( FILENAME, 'BIOFSRCE', 1 , 
      &                             0d0,       IIPAR,     JJPAR,     
      &                             1,         ARRAY,     QUIET=.TRUE. ) 
                           
                   ! Cast from REAL*4 to REAL*8, resize to (IIPAR,JJPAR)
                   BIOFUEL_KG(N,:,:) = ARRAY(:,:,1)
+
+#endif
                
                ENDIF
 !eml]
@@ -511,6 +545,31 @@
                ! Biofuel CO
                !----------------
 
+#if defined( MODELE )
+
+                  CALL READ_BPCH2( FILENAME, 'BIOFSRCE', 4, 
+     &                 0d0, 144, 91, 1, GENERIC_2x25, QUIET=.TRUE. )
+
+                  ! Cast from REAL*4 to REAL*8 
+                  GENERIC_8_2x25 = GENERIC_2x25
+                  
+                  ! File with lat/lon edges for regridding
+                  LLFILENAME = TRIM( DATA_DIR_1x1) //
+     &              'MAP_A2A_Regrid_201203/MAP_A2A_latlon_geos2x25.nc'
+
+                  ! Regrid to current model resolution
+                  INGRID => GENERIC_8_2x25
+                  CALL DO_REGRID_A2A( LLFILENAME,     144,        91,
+     &                                INGRID,     OUTGRID, IS_MASS=1,
+     &                                netCDF=.TRUE. )
+                  BIOFUEL_KG(N,:,:) = OUTGRID
+                  BF_CO             = OUTGRID  
+                  
+                  ! Free pointer
+                  NULLIFY( INGRID )
+
+#else
+
                ! Read biofuel CO emissions in [kg/box/yr] -- tracer #4
                CALL READ_BPCH2( FILENAME, 'BIOFSRCE', 4, 
      &                          0d0,       IIPAR,     JJPAR,     
@@ -519,6 +578,8 @@
                ! Cast from REAL*4 to REAL*8, resize to (IIPAR,JJPAR)
                BIOFUEL_KG(N,:,:) = ARRAY(:,:,1)
                BF_CO             = ARRAY(:,:,1)
+
+#endif
 
                ! Scale CO to account for oxidation of extra VOC's
                CALL SCALE_BIOFUEL_CO( BIOFUEL_KG(N,:,:) )
@@ -541,6 +602,30 @@
                ! Biofuel ALK4
                !----------------
 
+#if defined( MODELE )
+
+                  CALL READ_BPCH2( FILENAME, 'BIOFSRCE', 5, 
+     &                 0d0, 144, 91, 1, GENERIC_2x25, QUIET=.TRUE. )
+
+                  ! Cast from REAL*4 to REAL*8 
+                  GENERIC_8_2x25 = GENERIC_2x25
+                  
+                  ! File with lat/lon edges for regridding
+                  LLFILENAME = TRIM( DATA_DIR_1x1) //
+     &              'MAP_A2A_Regrid_201203/MAP_A2A_latlon_geos2x25.nc'
+
+                  ! Regrid to current model resolution
+                  INGRID => GENERIC_8_2x25
+                  CALL DO_REGRID_A2A( LLFILENAME,     144,        91,
+     &                                INGRID,     OUTGRID, IS_MASS=1,
+     &                                netCDF=.TRUE. )
+                  BIOFUEL_KG(N,:,:) = OUTGRID  
+                  
+                  ! Free pointer
+                  NULLIFY( INGRID )
+
+#else
+
                ! Read biofuel ALK4 emissions in [kg/box/yr] -- tracer #5
                CALL READ_BPCH2( FILENAME, 'BIOFSRCE', 5, 
      &                          0d0,       IIPAR,     JJPAR,     
@@ -548,6 +633,8 @@
 
                ! Cast from REAL*4 to REAL*8, resize to (IIPAR,JJPAR)
                BIOFUEL_KG(N,:,:) = ARRAY(:,:,1)
+
+#endif
 
                ! Compute future ALK4 emissions (if necessary)
                IF ( LFUTURE ) THEN
@@ -567,6 +654,30 @@
                ! Biofuel ACET
                !----------------
 
+#if defined( MODELE )
+
+                  CALL READ_BPCH2( FILENAME, 'BIOFSRCE', 9, 
+     &                 0d0, 144, 91, 1, GENERIC_2x25, QUIET=.TRUE. )
+
+                  ! Cast from REAL*4 to REAL*8 
+                  GENERIC_8_2x25 = GENERIC_2x25
+                  
+                  ! File with lat/lon edges for regridding
+                  LLFILENAME = TRIM( DATA_DIR_1x1) //
+     &              'MAP_A2A_Regrid_201203/MAP_A2A_latlon_geos2x25.nc'
+
+                  ! Regrid to current model resolution
+                  INGRID => GENERIC_8_2x25
+                  CALL DO_REGRID_A2A( LLFILENAME,     144,        91,
+     &                                INGRID,     OUTGRID, IS_MASS=1,
+     &                                netCDF=.TRUE. )
+                  BIOFUEL_KG(N,:,:) = OUTGRID  
+                  
+                  ! Free pointer
+                  NULLIFY( INGRID )
+
+#else
+
                ! Read biofuel ACET emissions in [kg/box/yr] -- tracer #9
                CALL READ_BPCH2( FILENAME, 'BIOFSRCE', 9, 
      &                          0d0,       IIPAR,     JJPAR,     
@@ -574,6 +685,8 @@
 
                ! Cast from REAL*4 to REAL*8, resize to (IIPAR,JJPAR)
                BIOFUEL_KG(N,:,:) = ARRAY(:,:,1)
+
+#endif
 
                ! Scale to match a posteriori source (bdf, bmy, 9/10/01)
                CALL SCALE_BIOFUEL_ACET( BIOFUEL_KG(N,:,:) )
@@ -596,6 +709,30 @@
                ! Biofuel MEK
                !----------------
 
+#if defined( MODELE )
+
+                  CALL READ_BPCH2( FILENAME, 'BIOFSRCE', 10, 
+     &                 0d0, 144, 91, 1, GENERIC_2x25, QUIET=.TRUE. )
+
+                  ! Cast from REAL*4 to REAL*8 
+                  GENERIC_8_2x25 = GENERIC_2x25
+                  
+                  ! File with lat/lon edges for regridding
+                  LLFILENAME = TRIM( DATA_DIR_1x1) //
+     &              'MAP_A2A_Regrid_201203/MAP_A2A_latlon_geos2x25.nc'
+
+                  ! Regrid to current model resolution
+                  INGRID => GENERIC_8_2x25
+                  CALL DO_REGRID_A2A( LLFILENAME,     144,        91,
+     &                                INGRID,     OUTGRID, IS_MASS=1,
+     &                                netCDF=.TRUE. )
+                  BIOFUEL_KG(N,:,:) = OUTGRID  
+                  
+                  ! Free pointer
+                  NULLIFY( INGRID )
+
+#else
+
                ! Read biofuel MEK emissions in [kg/box/yr] -- tracer #10
                CALL READ_BPCH2( FILENAME, 'BIOFSRCE', 10, 
      &                          0d0,       IIPAR,     JJPAR,      
@@ -603,6 +740,8 @@
 
                ! Cast from REAL*4 to REAL*8, resize to (IIPAR,JJPAR)
                BIOFUEL_KG(N,:,:) = ARRAY(:,:,1)
+
+#endif
 
                ! Compute future MEK emissions (if necessary)
                IF ( LFUTURE ) THEN
@@ -622,6 +761,30 @@
                ! Biofuel ALD2
                !----------------
 
+#if defined( MODELE )
+
+                  CALL READ_BPCH2( FILENAME, 'BIOFSRCE', 11, 
+     &                 0d0, 144, 91, 1, GENERIC_2x25, QUIET=.TRUE. )
+
+                  ! Cast from REAL*4 to REAL*8 
+                  GENERIC_8_2x25 = GENERIC_2x25
+                  
+                  ! File with lat/lon edges for regridding
+                  LLFILENAME = TRIM( DATA_DIR_1x1) //
+     &              'MAP_A2A_Regrid_201203/MAP_A2A_latlon_geos2x25.nc'
+
+                  ! Regrid to current model resolution
+                  INGRID => GENERIC_8_2x25
+                  CALL DO_REGRID_A2A( LLFILENAME,     144,        91,
+     &                                INGRID,     OUTGRID, IS_MASS=1,
+     &                                netCDF=.TRUE. )
+                  BIOFUEL_KG(N,:,:) = OUTGRID  
+                  
+                  ! Free pointer
+                  NULLIFY( INGRID )
+
+#else
+
                ! Read biofuel ALD2 emissions in [kg/box/yr] -- tracer #11
                CALL READ_BPCH2( FILENAME, 'BIOFSRCE', 11, 
      &                          0d0,       IIPAR,     JJPAR,      
@@ -629,6 +792,8 @@
 
                ! Cast from REAL*4 to REAL*8, resize to (IIPAR,JJPAR)
                BIOFUEL_KG(N,:,:) = ARRAY(:,:,1)
+
+#endif
 
                ! Compute future ALD2 emissions (if necessary)
                IF ( LFUTURE ) THEN
@@ -648,6 +813,30 @@
                ! Biofuel PRPE
                !----------------
 
+#if defined( MODELE )
+
+                  CALL READ_BPCH2( FILENAME, 'BIOFSRCE', 18, 
+     &                 0d0, 144, 91, 1, GENERIC_2x25, QUIET=.TRUE. )
+
+                  ! Cast from REAL*4 to REAL*8 
+                  GENERIC_8_2x25 = GENERIC_2x25
+                  
+                  ! File with lat/lon edges for regridding
+                  LLFILENAME = TRIM( DATA_DIR_1x1) //
+     &              'MAP_A2A_Regrid_201203/MAP_A2A_latlon_geos2x25.nc'
+
+                  ! Regrid to current model resolution
+                  INGRID => GENERIC_8_2x25
+                  CALL DO_REGRID_A2A( LLFILENAME,     144,        91,
+     &                                INGRID,     OUTGRID, IS_MASS=1,
+     &                                netCDF=.TRUE. )
+                  BIOFUEL_KG(N,:,:) = OUTGRID  
+                  
+                  ! Free pointer
+                  NULLIFY( INGRID )
+
+#else
+
                ! Read biofuel PRPE emissions in [kg/box/yr] -- tracer #18
                CALL READ_BPCH2( FILENAME, 'BIOFSRCE', 18, 
      &                          0d0,       IIPAR,     JJPAR,      
@@ -655,6 +844,8 @@
 
                ! Cast from REAL*4 to REAL*8, resize to (IIPAR,JJPAR)
                BIOFUEL_KG(N,:,:) = ARRAY(:,:,1)
+
+#endif
 
                ! Compute future PRPE emissions (if necessary)
                IF ( LFUTURE ) THEN
@@ -674,6 +865,30 @@
                ! Biofuel C3H8
                !----------------
 
+#if defined( MODELE )
+
+                  CALL READ_BPCH2( FILENAME, 'BIOFSRCE', 19, 
+     &                 0d0, 144, 91, 1, GENERIC_2x25, QUIET=.TRUE. )
+
+                  ! Cast from REAL*4 to REAL*8 
+                  GENERIC_8_2x25 = GENERIC_2x25
+                  
+                  ! File with lat/lon edges for regridding
+                  LLFILENAME = TRIM( DATA_DIR_1x1) //
+     &              'MAP_A2A_Regrid_201203/MAP_A2A_latlon_geos2x25.nc'
+
+                  ! Regrid to current model resolution
+                  INGRID => GENERIC_8_2x25
+                  CALL DO_REGRID_A2A( LLFILENAME,     144,        91,
+     &                                INGRID,     OUTGRID, IS_MASS=1,
+     &                                netCDF=.TRUE. )
+                  BIOFUEL_KG(N,:,:) = OUTGRID  
+                  
+                  ! Free pointer
+                  NULLIFY( INGRID )
+
+#else
+
                ! Read biofuel C3H8 emissions in [kg/box/yr] -- tracer #19
                CALL READ_BPCH2( FILENAME, 'BIOFSRCE', 19, 
      &                          0d0,       IIPAR,     JJPAR,      
@@ -681,6 +896,8 @@
 
                ! Cast from REAL*4 to REAL*8, resize to (IIPAR,JJPAR)
                BIOFUEL_KG(N,:,:) = ARRAY(:,:,1)
+
+#endif
 
                ! Compute future C3H8 emissions (if necessary)
                IF ( LFUTURE ) THEN
@@ -700,6 +917,30 @@
                ! Biofuel CH2O
                !----------------
 
+#if defined( MODELE )
+
+                  CALL READ_BPCH2( FILENAME, 'BIOFSRCE', 20, 
+     &                 0d0, 144, 91, 1, GENERIC_2x25, QUIET=.TRUE. )
+
+                  ! Cast from REAL*4 to REAL*8 
+                  GENERIC_8_2x25 = GENERIC_2x25
+                  
+                  ! File with lat/lon edges for regridding
+                  LLFILENAME = TRIM( DATA_DIR_1x1) //
+     &              'MAP_A2A_Regrid_201203/MAP_A2A_latlon_geos2x25.nc'
+
+                  ! Regrid to current model resolution
+                  INGRID => GENERIC_8_2x25
+                  CALL DO_REGRID_A2A( LLFILENAME,     144,        91,
+     &                                INGRID,     OUTGRID, IS_MASS=1,
+     &                                netCDF=.TRUE. )
+                  BIOFUEL_KG(N,:,:) = OUTGRID  
+                  
+                  ! Free pointer
+                  NULLIFY( INGRID )
+
+#else
+
                ! Read biofuel CH2O emissions in [kg/box/yr] -- tracer #20
                CALL READ_BPCH2( FILENAME, 'BIOFSRCE', 20, 
      &                          0d0,       IIPAR,     JJPAR,      
@@ -707,6 +948,8 @@
 
                ! Cast from REAL*4 to REAL*8, resize to (IIPAR,JJPAR)
                BIOFUEL_KG(N,:,:) = ARRAY(:,:,1)
+
+#endif
 
                ! Compute future CH2O emissions (if necessary)
                IF ( LFUTURE ) THEN
@@ -726,6 +969,30 @@
                ! Biofuel C2H6
                !----------------
 
+#if defined( MODELE )
+
+                  CALL READ_BPCH2( FILENAME, 'BIOFSRCE', 21, 
+     &                 0d0, 144, 91, 1, GENERIC_2x25, QUIET=.TRUE. )
+
+                  ! Cast from REAL*4 to REAL*8 
+                  GENERIC_8_2x25 = GENERIC_2x25
+                  
+                  ! File with lat/lon edges for regridding
+                  LLFILENAME = TRIM( DATA_DIR_1x1) //
+     &              'MAP_A2A_Regrid_201203/MAP_A2A_latlon_geos2x25.nc'
+
+                  ! Regrid to current model resolution
+                  INGRID => GENERIC_8_2x25
+                  CALL DO_REGRID_A2A( LLFILENAME,     144,        91,
+     &                                INGRID,     OUTGRID, IS_MASS=1,
+     &                                netCDF=.TRUE. )
+                  BIOFUEL_KG(N,:,:) = OUTGRID  
+                  
+                  ! Free pointer
+                  NULLIFY( INGRID )
+
+#else
+
                ! Read biofuel C2H6 emissions in [kg/box/yr] -- tracer #21
                CALL READ_BPCH2( FILENAME, 'BIOFSRCE', 21, 
      &                          0d0,       IIPAR,     JJPAR,      
@@ -733,6 +1000,8 @@
 
                ! Cast from REAL*4 to REAL*8, resize to (IIPAR,JJPAR)
                BIOFUEL_KG(N,:,:) = ARRAY(:,:,1)
+
+#endif
 
                ! Compute future C2H6 emissions (if necessary)
                IF ( LFUTURE ) THEN

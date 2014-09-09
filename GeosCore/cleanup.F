@@ -38,6 +38,7 @@
       USE DIAG53_MOD,              ONLY : CLEANUP_DIAG53 !(clf, 3/11/11)
       USE DIAG_OH_MOD,             ONLY : CLEANUP_DIAG_OH
       USE DIAG_PL_MOD,             ONLY : CLEANUP_DIAG_PL
+      USE DIAG_MASS_FLUX_QUS,      ONLY : CLEANUP_MASS_FLUX
       USE DRYDEP_MOD,              ONLY : CLEANUP_DRYDEP
       USE DUST_MOD,                ONLY : CLEANUP_DUST
       USE DUST_DEAD_MOD,           ONLY : CLEANUP_DUST_DEAD
@@ -233,6 +234,7 @@
 !  26 Sep 2013 - R. Yantosca - Now reference EXIT_GEOSFP_TPCORE_WINDOW
 !  29 Oct 2013 - R. Yantosca - Now call CLEANUP_DAO for all simulations (if
 !                              arrays are not allocated it'll exit gracefully)
+!  06 Jul 2014 - L. Murray   - Add QUS mass flux diagnostic cleanup
 !EOP
 !------------------------------------------------------------------------------
 !BOC
@@ -295,6 +297,7 @@
       CALL CLEANUP_ISOROPIAII
       CALL CLEANUP_LIGHTNING_NOX
       CALL CLEANUP_LINOZ
+      CALL CLEANUP_MASS_FLUX
       CALL CLEANUP_MEGAN
       CALL CLEANUP_MERCURY
       CALL CLEANUP_MODIS_LAI

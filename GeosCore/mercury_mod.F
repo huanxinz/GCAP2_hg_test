@@ -532,10 +532,10 @@
       !%%% NOTE: Someone will have to add tunings for the GEOS-5.7.2
       !%%% nested grids at 0.25 x 0.3125 resolution (bmy, 6/3/13)
       !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-#if defined( GRID4x5 )
+#if defined( GRID4x5 ) || defined( GRIDM23 )
       !REAL*8, PARAMETER     :: K_RED_JNO2 = 3.5d-3 / 2d0 ! ref: Amos et al. (2011)
       REAL*8, PARAMETER     :: K_RED_JNO2 = 6.4d-3 ! yzh, consider cloud fraction 
-#elif defined( GRID2x25 )
+#elif defined( GRID2x25 ) || defined( GRIDF40 )
       REAL*8, PARAMETER     :: K_RED_JNO2 = 3.5D-3/2d0
 #elif defined( GRID05x0666 ) && defined( NESTED_NA )
       REAL*8, PARAMETER     :: K_RED_JNO2 = 6.4D-3 * 1.33 ! yzh

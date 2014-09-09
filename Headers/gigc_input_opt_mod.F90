@@ -52,7 +52,7 @@ MODULE GIGC_Input_Opt_Mod
      LOGICAL                     :: LSVGLB             
      CHARACTER(LEN=255)          :: OUT_RST_FILE       
      CHARACTER(LEN=255)          :: DATA_DIR           
-     CHARACTER(LEN=255)          :: GCAP_DIR           
+     CHARACTER(LEN=255)          :: GISS_DIR           
      CHARACTER(LEN=255)          :: GEOS_4_DIR         
      CHARACTER(LEN=255)          :: GEOS_5_DIR         
      CHARACTER(LEN=255)          :: GEOS_FP_DIR        
@@ -741,7 +741,7 @@ CONTAINS
     Input_Opt%LSVGLB                 = .FALSE.
     Input_Opt%OUT_RST_FILE           = ''
     Input_Opt%DATA_DIR               = ''
-    Input_Opt%GCAP_DIR               = ''
+    Input_Opt%GISS_DIR               = ''
     Input_Opt%GEOS_4_DIR             = ''
     Input_Opt%GEOS_5_DIR             = ''
     Input_Opt%GEOS_FP_DIR            = ''

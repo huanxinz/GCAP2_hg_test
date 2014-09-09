@@ -51,6 +51,9 @@ MODULE GIGC_State_Chm_Mod
      INTEGER,           POINTER :: Spec_Id    (:      )  ! Species ID # 
      CHARACTER(LEN=14), POINTER :: Spec_Name  (:      )  ! Species names
      REAL*8,            POINTER :: Species    (:,:,:,:)  ! Species [molec/cm3]
+#if defined( QUS )
+     REAL*8,            POINTER :: Trac_Mom   (:,:,:,:,:)! Tracer mass moments
+#endif
 
      ! Chemical rates & rate parameters
      REAL*8,            POINTER :: DepSav     (:,:,:  )  ! Drydep freq [1/s]
@@ -382,12 +385,18 @@ CONTAINS
 !------------------------------------------------------------------------------
 !BOC
     INTEGER                       :: MAX_DEP
+    INTEGER                       :: NMOM
 
     ! Assume success until otherwise
     RC = GIGC_SUCCESS
 
     ! Maximum # of drydep species
     MAX_DEP = Input_Opt%MAX_DEP
+
+#if defined( QUS )
+    ! Number of advected moments for QUS scheme
+    NMOM = 9
+#endif
 
     !=====================================================================
     ! Allocate advected tracer fields
@@ -401,6 +410,13 @@ CONTAINS
 
     ALLOCATE( State_Chm%Tracers       ( IM, JM, LM, nTracers+1 ), STAT=RC )
     IF ( RC /= GIGC_SUCCESS ) RETURN
+
+#if defined( QUS )
+
+    ALLOCATE( State_Chm%Trac_Mom( NMOM, IM, JM, LM, nTracers+1 ), STAT=RC )
+    IF ( RC /= GIGC_SUCCESS ) RETURN
+
+#endif
 
     ALLOCATE( State_Chm%Trac_Tend     ( IM, JM, LM, nTracers+1 ), STAT=RC )
     IF ( RC /= GIGC_SUCCESS ) RETURN
@@ -557,6 +573,9 @@ CONTAINS
     IF ( ASSOCIATED(State_Chm%Spec_Name  ) ) DEALLOCATE(State_Chm%Spec_Name  )
     IF ( ASSOCIATED(State_Chm%Trac_Tend  ) ) DEALLOCATE(State_Chm%Trac_Tend  )
     IF ( ASSOCIATED(State_Chm%Trac_Btend ) ) DEALLOCATE(State_Chm%Trac_Btend )
+#if defined( QUS )
+    IF ( ASSOCIATED(State_Chm%Trac_Mom   ) ) DEALLOCATE(State_Chm%Trac_Mom   )
+#endif
     IF ( ASSOCIATED(State_Chm%Tracers    ) ) DEALLOCATE(State_Chm%Tracers    )
     IF ( ASSOCIATED(State_Chm%Species    ) ) DEALLOCATE(State_Chm%Species    )
     IF ( ASSOCIATED(State_Chm%DepSav     ) ) DEALLOCATE(State_Chm%DepSav     )

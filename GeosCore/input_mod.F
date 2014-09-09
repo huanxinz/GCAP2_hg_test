@@ -645,7 +645,7 @@
 ! !USES:
 !     
       USE CMN_SIZE_MOD
-      USE DIRECTORY_MOD,      ONLY : DATA_DIR,    DATA_DIR_1x1, GCAP_DIR
+      USE DIRECTORY_MOD,      ONLY : DATA_DIR,    DATA_DIR_1x1, GISS_DIR
       USE DIRECTORY_MOD,      ONLY : GEOS_4_DIR,  GEOS_5_DIR
       USE DIRECTORY_MOD,      ONLY : MERRA_DIR,   GEOS_FP_DIR
       USE DIRECTORY_MOD,      ONLY : RUN_DIR
@@ -679,7 +679,7 @@
 ! !REVISION HISTORY: 
 !  20 Jul 2004 - R. Yantosca - Initial version
 !  (1 ) Bug fix: Read LSVGLB w/ the * format and not w/ '(a)'. (bmy, 2/23/05)
-!  (2 ) Now read GEOS_5_DIR and GCAP_DIR from input.geos (swu, bmy, 5/25/05)
+!  (2 ) Now read GEOS_5_DIR and GISS_DIR from input.geos (swu, bmy, 5/25/05)
 !  (3 ) Now make sure all USE statements are USE, ONLY (bmy, 10/3/05)
 !  (4 ) Now references DATA_DIR_1x1 for 1x1 emissions files (bmy, 10/24/05)
 !  (5 ) Now read switch for using variable tropopause or not (phs, 9/14/06)
@@ -752,7 +752,7 @@
 
       ! GCAP subdir
       CALL SPLIT_ONE_LINE( SUBSTRS, N, 1, 'read_simulation_menu:8' )
-      READ( SUBSTRS(1:N), '(a)' ) GCAP_DIR
+      READ( SUBSTRS(1:N), '(a)' ) GISS_DIR
 
       ! GEOS-4 subdir
       CALL SPLIT_ONE_LINE( SUBSTRS, N, 1, 'read_simulation_menu:9' )
@@ -859,7 +859,7 @@
       Input_Opt%LSVGLB        = LSVGLB
       Input_Opt%OUT_RST_FILE  = OUT_RST_FILE
       Input_Opt%DATA_DIR      = DATA_DIR
-      Input_Opt%GCAP_DIR      = GCAP_DIR
+      Input_Opt%GISS_DIR      = GISS_DIR
       Input_Opt%GEOS_4_DIR    = GEOS_4_DIR
       Input_Opt%GEOS_5_DIR    = GEOS_5_DIR
       Input_Opt%GEOS_FP_DIR   = GEOS_FP_DIR
@@ -888,7 +888,7 @@
          WRITE( 6, 110 ) 'Data Directory              : ',
      &                    TRIM( DATA_DIR )
          WRITE( 6, 110 ) 'GCAP       sub-directory    : ', 
-     &                    TRIM( GCAP_DIR )
+     &                    TRIM( GISS_DIR )
          WRITE( 6, 110 ) 'GEOS-4     sub-directory    : ', 
      &                    TRIM( GEOS_4_DIR )
          WRITE( 6, 110 ) 'GEOS-5     sub-directory    : ', 
@@ -1063,6 +1063,18 @@
       DLAT(:,JNP,:) = 2.0d0              !  Half-sized N Pole boxes
 # endif
 
+#elif defined( GRIDM23 )
+
+      !-------------------------------------
+      ! GISS global medium resolution grid
+      !-------------------------------------
+      JSP             = 1                  ! Lat index of S Pole
+      JNP             = JJPAR              ! Lat index of N pole
+      DLON            = 5.0d0              ! Delta-longitude array [degrees]
+      DLAT            = 4.0d0              ! Delta-latitude array [degrees]
+      DLAT(:,1,    :) = 2.0d0              !  Half-sized S Pole boxes
+      DLAT(:,JJPAR,:) = 2.0d0              !  Half-sized N Pole boxes
+
 #elif defined( GRID2x25 )
 
       !-----------------------------
@@ -1076,6 +1088,18 @@
       DLAT(:,JSP,:) = 1.0d0              !  Half-sized S Pole boxes
       DLAT(:,JNP,:) = 1.0d0              !  Half-sized N Pole boxes
 # endif
+
+#elif defined( GRIDF40 )
+
+      !-------------------------------------
+      ! GISS global fine resolution grid
+      !-------------------------------------
+      JSP             = 1                  ! Lat index of S Pole
+      JNP             = JJPAR              ! Lat index of N pole
+      DLON            = 2.5d0              ! Delta-longitude array [degrees]
+      DLAT            = 2.0d0              ! Delta-latitude array [degrees]
+      DLAT(:,1,    :) = 1.0d0              ! Half-sized S Pole boxes
+      DLAT(:,JJPAR,:) = 1.0d0              ! Half-sized N Pole boxes
 
 #elif defined( GRID1x125 )
 
@@ -2938,7 +2962,7 @@
 !     ICARTT corrections are NOT available at high resolution
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
       
-#if !defined(GRID2x25) && !defined(GRID4x5)
+#if !defined(GRID2x25) && !defined(GRID4x5) && !defined(GRIDM23) && !defined(GRIDF40)
       
       IF ( LICARTT ) THEN
          LICARTT = .FALSE.
@@ -3110,7 +3134,7 @@
          ENDIF
       ENDIF
 
-#if    defined( GCAP )
+#if    defined( GCAP ) || defined( MODELE )
 
       !--------------------------------
       ! GCAP error message 
@@ -3910,6 +3934,10 @@
       CALL SPLIT_ONE_LINE( SUBSTRS, N, 1, 'read_chemistry_menu:11' )
       READ( SUBSTRS(1:N), * ) LO3FJX
 
+#if defined( GISS )
+      LO3FJX = .TRUE.
+#endif
+
       ! GAMMA HO2 ?
       CALL SPLIT_ONE_LINE( SUBSTRS, N, 1, 'read_chemistry_menu:12' )
       READ( SUBSTRS(1:N), * ) Input_Opt%GAMMA_HO2
@@ -4157,9 +4185,9 @@
       !=================================================================      
       
       ! Define maximum timestep for transport
-#if   defined( GRID4x5   ) 
+#if   defined( GRID4x5   ) || defined( GRIDM23 )
       MAX_DYN = 30
-#elif defined( GRID2x25  )
+#elif defined( GRID2x25  ) || defined( GRIDF40 )
       MAX_DYN = 15
 #elif defined( GRID1x125 )
       MAX_DYN = 10
@@ -8452,14 +8480,14 @@
 #elif defined( GCAP )
 
       ! Check GEOS-5 met field directory (starting date)
-      DIR = GCAP_DIR
+      DIR = GISS_DIR
       CALL EXPAND_DATE( DIR, NYMDb, 000000 )
       DIR = TRIM( DATA_DIR ) // TRIM( DIR )
       CALL CHECK_DIRECTORY( DIR )
 
 
       ! Check GEOS-5 met field directory (ending date)
-      DIR = GCAP_DIR
+      DIR = GISS_DIR
       CALL EXPAND_DATE( DIR, NYMDe, 000000 )
       DIR = TRIM( DATA_DIR ) // TRIM( DIR )
       CALL CHECK_DIRECTORY( DIR )

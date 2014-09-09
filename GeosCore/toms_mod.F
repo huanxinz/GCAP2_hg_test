@@ -226,6 +226,11 @@
       YEAR = THISYEAR
 #endif
 
+#if   defined( GISS ) 
+      ! Use simulated ozone columns for different climates
+      RETURN
+#endif
+
       ! Use 1979 data prior to 1979
       IF ( YEAR < FIRST_TOMS_YEAR ) THEN
          WRITE( 6, 100 ) YEAR

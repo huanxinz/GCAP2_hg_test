@@ -489,6 +489,12 @@
 #elif defined( GEOS_5 ) || defined( MERRA ) || defined( GEOS_FP )
       PBLTOP = 5
       MTTOP  = 10
+#elif defined( GRIDM23 )
+      PBLTOP = 5
+      MTTOP  = 8
+#elif defined( GRIDF40 )
+      PBLTOP = 9
+      MTTOP  = 17
 #endif
 
 #if defined( USE_ALL_TAGO3_TRACERS )
@@ -695,7 +701,7 @@
       REAL*8            :: ND44_TMP(IIPAR,JJPAR,LLTROP)
       REAL*8            :: DTCHEM,  FREQ,    FLUX
       REAL*8            :: LL,      PL,      Ox_0
-      REAL*8            :: Ox_LOST, PBL_MAX, F_UNDER_TOP
+      REAL*8            :: Ox_LOST, PBL_MAX, F_UNDER_TOP, k, P
       CHARACTER(LEN=16) :: STAMP
 
       ! For fields from Input_Opt
@@ -764,6 +770,7 @@
 !$OMP PARALLEL DO
 !$OMP+DEFAULT( SHARED )
 !$OMP+PRIVATE( I, J, L, LL, PL, FREQ, Ox_0, Ox_LOST, FLUX, F_UNDER_TOP )  
+!$OMP+PRIVATE( P, k )
 !$OMP+SCHEDULE( DYNAMIC )
          DO L = 1, LLTROP
          DO J = 1, JJPAR
@@ -782,8 +789,12 @@
             IF ( ITS_IN_THE_TROP( I, J, L, State_Met ) ) THEN
                LL = STT(I,J,L,N)           * L24H(I,J,L) *
      &              BOXVL(I,J,L,State_Met) * DTCHEM
+               P  = P24H(I,J,L) * BOXVL(I,J,L,State_Met) ! kg s-1
+               k  = L24H(I,J,L) * BOXVL(I,J,L,State_Met) ! s-1
             ELSE
                LL = 0.0d0
+               P  = 0d0
+               k  = 0d0
             ENDIF 
 
             !===========================================================
@@ -856,7 +867,16 @@
             ! After removing Ox lost to dry deposition, apply 
             ! chemical P(Ox) - L(Ox) to each tagged tracer
             !===========================================================
-            STT(I,J,L,N) = STT(I,J,L,N) + PP(I,J,L,N) - LL
+            ! Old linearized method
+            !STT(I,J,L,N) = STT(I,J,L,N) + PP(I,J,L,N) - LL
+            ! Use analytic solution (ltm)
+            IF ( k .gt. 0 ) THEN
+               STT(I,J,L,N) = STT(I,J,L,N) * 
+     &              EXP(-k*DTCHEM) + (P/k)*(1d0-EXP(-k*DTCHEM))
+            ELSE
+               STT(I,J,L,N) = STT(I,J,L,N) + P * DTCHEM
+            ENDIF
+
          ENDDO
          ENDDO
          ENDDO

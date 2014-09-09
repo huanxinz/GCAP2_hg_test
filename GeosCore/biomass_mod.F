@@ -160,7 +160,7 @@
 
       SUBROUTINE COMPUTE_BIOMASS_EMISSIONS( am_I_Root, YEAR,      
      &                                      MONTH,     Input_Opt, 
-     &                                      State_Chm, RC         )
+     &                                      State_Chm, State_Met, RC )
 !
 !******************************************************************************
 !  Subroutine COMPUTE_BIOMASS_EMISSIONS is a wrapper which allows us to select
@@ -214,6 +214,7 @@
       USE GIGC_ErrCode_Mod
       USE GIGC_Input_Opt_Mod, ONLY : OptInput
       USE GIGC_State_Chm_Mod, ONLY : ChmState
+      USE GIGC_State_Met_Mod, ONLY : MetState
       USE TIME_MOD,           ONLY : ITS_A_NEW_MONTH
       USE TRACERID_MOD,       ONLY : IDTBCPO, IDTNH3, IDTOCPO, IDTSO2
       USE TRACERID_MOD,       ONLY : IDBBC, IDBNH3, IDBOC, IDBSO2
@@ -238,6 +239,7 @@
 ! !INPUT/OUTPUT PARAMETERS:
 !
       TYPE(ChmState), INTENT(INOUT) :: State_Chm   ! Chemistry State object
+      TYPE(MetState), INTENT(IN   ) :: State_Met   ! Meteorology State object
 !
 ! !OUTPUT PARAMETERS:
 !
@@ -386,12 +388,13 @@
                ! Now send entire BIOMASS array since gas and aerosol
                ! species might be intermixed (hotp 8/3/09)
                ! Only the standard 10 gas phase species will be updated
-               CALL GC_COMPUTE_BIOMASS( YEAR, MONTH, BIOMASS )
+               CALL GC_COMPUTE_BIOMASS( YEAR, MONTH, BIOMASS, 
+     &                                  State_Met                    )
 
                ! Get biomass SO2 [molec/cm2/s]
                IF ( IDTSO2 > 0 ) THEN
                   CALL GC_READ_BIOMASS_SO2( YEAR, MONTH, 
-     &                                      BIOMASS(:,:,IDBSO2) )
+     &                 BIOMASS(:,:,IDBSO2), State_Met )
                ENDIF
 
 #if defined( DEVEL )
@@ -402,8 +405,11 @@
                ! Get biomass NH3 [molec/cm2/s]
                IF ( IDTNH3 > 0 ) THEN
                   CALL GC_READ_BIOMASS_NH3( YEAR, MONTH,
-     &                                      BIOMASS(:,:,IDBNH3) )
+     &                 BIOMASS(:,:,IDBNH3), State_Met )
                ENDIF
+
+               WRITE(6,*) 'Finish NH3!'
+               CALL FLUSH(6)
 
 #if defined( DEVEL )
                State_Chm%TRAC_BTEND(:,:,1,IDBNH3) = 
@@ -417,7 +423,8 @@
                   IF ( IDTOCPO > 0 .or. IDTPOA1 > 0 ) THEN
                   CALL GC_READ_BIOMASS_BCOC( YEAR, MONTH,
      &                                       BIOMASS(:,:,IDBBC), 
-     &                                       BIOMASS(:,:,IDBOC) ) 
+     &                                       BIOMASS(:,:,IDBOC), 
+     &                                       State_Met ) 
                   ENDIF
                ENDIF
 #if defined( DEVEL )
@@ -448,7 +455,7 @@
 #endif
             ENDIF
          ENDIF
-
+         
          !==============================================================
          ! NAP emissions
          !==============================================================

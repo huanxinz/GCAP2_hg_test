@@ -169,7 +169,7 @@
       INTEGER              :: ND51_FREQ,      ND51_NI
       INTEGER              :: ND51_NJ,        ND51_NL
       INTEGER              :: HALFPOLAR
-      INTEGER, PARAMETER   :: CENTER180=1
+      INTEGER              :: CENTER180
       REAL*4               :: LONRES,         LATRES
       REAL*8               :: TAU0,           TAU1
       REAL*8               :: ND51_HR1,       ND51_HR2
@@ -2065,6 +2065,7 @@
 !
       USE BPCH2_MOD,  ONLY : GET_MODELNAME
       USE BPCH2_MOD,  ONLY : GET_HALFPOLAR
+      USE BPCH2_MOD,  ONLY : GET_CENTER180
       USE ERROR_MOD,  ONLY : ALLOC_ERR
       USE ERROR_MOD,  ONLY : ERROR_STOP
       USE GRID_MOD,   ONLY : GET_XOFFSET
@@ -2244,6 +2245,7 @@
       LATRES    = DJSIZE
       MODELNAME = GET_MODELNAME()
       HALFPOLAR = GET_HALFPOLAR()
+      CENTER180 = GET_CENTER180()
 
       ! Reset offsets to global values for bpch write
       I0        = GET_XOFFSET( GLOBAL=.TRUE. )

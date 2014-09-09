@@ -1844,6 +1844,8 @@
          L_COPY = 36       ! MERRA: Copy up to L=36
 #elif defined( GCAP    )
          L_COPY = LGLOB    ! GCAP: Copy all levels
+#elif defined( GISS    )
+         L_COPY = LGLOB    ! GISS: Copy all levels
 #endif
 
       ENDIF
