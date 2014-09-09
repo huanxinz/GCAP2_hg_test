@@ -1830,6 +1830,9 @@
                CASE( 3 )
                   UNIT (T,45) = 'mBq/SCM'
                   SCALE(T,45) = 4.0513E+21
+               CASE( 4 )
+                  UNIT (T,45) = 'mBq/SCM'
+                  SCALE(T,45) = 4.0513E+21
                CASE DEFAULT
                   ! Nothing
             END SELECT

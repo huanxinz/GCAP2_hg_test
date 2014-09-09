@@ -86,6 +86,14 @@
 !
       ! For Lal & Peters emissions
       REAL*8            :: LATSOU(10), PRESOU(33), BESOU(10,33)
+
+      real*8            :: BeProd_Table( 104, 41, 31 )
+      real*8            :: BeProd_phi( 31 )
+      real*8            :: BeProd_gcr( 41 )
+      real*8            :: BeProd_depth( 104 )
+
+      real*8, parameter :: r2d = 180d0 / 3.14159d0
+      real*8, parameter :: d2r = 3.14159d0 / 180d0
 !
 ! !DEFINED PARAMETERS:
 !
@@ -95,6 +103,92 @@
       REAL*8, PARAMETER :: XNUMOL_Be = ( 6.0225d23 /   7.0d-3 )
 
       CONTAINS
+!EOC
+!------------------------------------------------------------------------------
+!          Harvard University Atmospheric Chemistry Modeling Group            !
+!------------------------------------------------------------------------------
+!BOP
+!
+! !IROUTINE: read_7Be
+!
+! !DESCRIPTION: Subroutine READ\_7Be reads the 7Be emissions from Lal \& 
+!  Peters on 33 pressure levels.  This only needs to be done on the very 
+!  first timestep.  
+!\\
+!\\
+! !INTERFACE:
+!
+      SUBROUTINE READ_7BE
+!
+! !USES:
+!
+      USE DIRECTORY_MOD, ONLY : DATA_DIR
+      USE FILE_MOD,      ONLY : IOERROR
+      USE CMN_SIZE_MOD        ! Size parameters
+!
+! !REVISION HISTORY: 
+!  07 Aug 2002 - H. Liu - Initial version
+!  (1 ) This code was split off from routine EMISSRnPbBe below. (bmy, 8/7/02)
+!  (2 ) Now reference DATA_DIR from "directory_mod.f" (bmy, 7/19/04)
+!  08 Dec 2009 - R. Yantosca - Added ProTeX headers
+!  29 May 2012 - L. Murray - New Be7 source param
+!  01 Aug 2012 - R. Yantosca - Add reference to findFreeLUN from inqure_mod.F90
+!EOP
+!------------------------------------------------------------------------------
+!BOC
+!
+! !LOCAL VARIABLES:
+!
+      integer            :: iunit, ios, t, s, g, l
+      character(len=256) :: fname
+      real*8             :: junk
+
+      fname = 'RnPbBe_201009/2007jd009725-ds01.fwf.txt'
+      !fname = trim( dataDir ) // trim( 'RnPbBe_201009/2007jd009725-ds01.txt' )
+
+      iunit = findFreeLUN()
+
+      open( iunit, file = trim( fname ), form='FORMATTED',
+     &     status='OLD', IOSTAT=IOS )
+      if ( ios .ne. 0 ) call ioerror( ios, iunit, 'read_Be_prod:1' )
+
+      ! The 31 values for phi (solar modulation potential)
+      BeProd_phi = (/ 0., 50, 100, 150, 200, 250, 300, 350, 400, 450,
+     &     500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1050,
+     &     1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500 /)
+
+      ! The 41 values for geomagnetic cutoff rigidity
+      BeProd_gcr = (/ 0., 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5,
+     &     6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10, 10.5, 11, 11.5, 12, 12.5,
+     &     13, 13.5, 14, 14.5, 15, 15.5, 16, 16.6, 17, 17.5, 18, 18.5,
+     &     19, 19.5, 20 /)
+
+      ! The 104 values for atmospheric depth
+      BeProd_depth = (/ 0., 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 
+     &     110, 120, 130, 140, 150, 160, 170, 180, 190, 200,
+     &     210, 220, 230, 240, 250, 260, 270, 280, 290, 300,
+     &     310, 320, 330, 340, 350, 360, 370, 380, 390, 400,
+     &     410, 420, 430, 440, 450, 460, 470, 480, 490, 500,
+     &     510, 520, 530, 540, 550, 560, 570, 580, 590, 600,
+     &     610, 620, 630, 640, 650, 660, 670, 680, 690, 700,
+     &     710, 720, 730, 740, 750, 760, 770, 780, 790, 800, 
+     &     810, 820, 830, 840, 850, 860, 870, 880, 890, 900,
+     &     910, 920, 930, 940, 950, 960, 970, 980, 990, 1000,
+     &     1010, 1020, 1030 /)
+
+      ! For each depth table
+      do t=1,104
+         ! For each cutoff rigidity
+         do g=1,41
+            read( iunit, 100, iostat=ios ) BeProd_Table(t,g,:)
+ 100        format( 31E10.3 ) 
+            !print*,t,g,BeProd_Table(t,g,:)
+         enddo
+      enddo
+
+      close( iunit )
+            
+      END SUBROUTINE READ_7BE
 !EOC
 !------------------------------------------------------------------------------
 !                  GEOS-Chem Global Chemical Transport Model                  !
@@ -110,7 +204,7 @@
 !\\
 ! !INTERFACE:
 !
-      SUBROUTINE READ_7BE
+      SUBROUTINE READ_7BE_LIU2001
 !
 ! !USES:
 !
@@ -193,7 +287,7 @@
       ! Close the file
       CLOSE( IU_FILE )
 
-      END SUBROUTINE READ_7BE
+      END SUBROUTINE READ_7BE_LIU2001
 !EOC
 !------------------------------------------------------------------------------
 !                  GEOS-Chem Global Chemical Transport Model                  !
@@ -275,6 +369,7 @@
       USE GRID_MOD,           ONLY : GET_AREA_CM2
       USE GRID_MOD,           ONLY : GET_YMID
       USE GRID_MOD,           ONLY : GET_YEDGE 
+      USE GRID_MOD,           ONLY : GET_XMID
       USE TIME_MOD,           ONLY : GET_TS_EMIS
       USE PRESSURE_MOD,       ONLY : GET_PCENTER
       USE VDIFF_PRE_MOD,      ONLY : EMIS_SAVE
@@ -353,6 +448,7 @@
       REAL*8        :: Be_TMP,     Rn_TMP,     LAT_S,     LAT_N
       REAL*8        :: LAT_H,      LAT_L,      F_LAND,    F_WATER
       REAL*8        :: F_BELOW_70, F_BELOW_60, F_ABOVE_60
+      REAL*8        :: LAT, LON, MAGLAT, PHI, DEPTH, GCR
 
       ! Pointers
       ! We need to define local arrays to hold corresponding values 
@@ -513,6 +609,7 @@
       ENDDO
 !$OMP END PARALLEL DO
 
+
       !=================================================================
       ! Add 7Be emissions into tracer #3 (if necessary)
       !
@@ -524,59 +621,53 @@
          ! Read 7Be emissions on the first timestep only
          IF ( FIRSTEMISS ) CALL READ_7BE
 
+         ! Get the solar modulation variable (e.g., 640 for 2004)
+         !IF ( LASTMONTH .ne. GET_MONTH() ) THEN
+         !   PHI = SOLAR_MODULATION_POTENTIAL( GET_YEAR(), GET_MONTH() )
+         !   LASTMONTH = GET_MONTH()
+         !ENDIF
+         PHI = 670. ! Fix to use mean solar activity
+
          !==============================================================
          ! Now interpolate from 33 std levels onto GEOS-CHEM levels 
          !==============================================================
 !$OMP PARALLEL DO
 !$OMP+DEFAULT( SHARED )
-!$OMP+PRIVATE( I, J, L, LAT_TMP, P_TMP, Be_TMP, ADD_Be )
+!$OMP+PRIVATE( I, J, L, LAT_TMP, P_TMP, Be_TMP, ADD_Be, DEPTH, GCR )
 !$OMP+SCHEDULE( DYNAMIC )
          DO L = 1, LLPAR
          DO J = 1, JJPAR
          DO I = 1, IIPAR
 
-            ! Get absolute value of latitude, since we will assume that 
-            ! the 7Be distribution is symmetric about the equator
-            LAT_TMP = ABS( GET_YMID( I, J, L ) )
+            ! Determine atmospheric depth from TOA in [g cm-2]
+            DEPTH  = 1d-1 * ( 1d2 * GET_PCENTER(I,J,L) / 9.80665d0 )
 
-            ! Pressure at (I,J,L) -- need to change for fvDAS!
-            P_TMP   = GET_PCENTER( I, J, L )
-                 
-            ! Interpolate 7Be [stars/g air/sec] to GEOS-CHEM levels
-            CALL SLQ( LATSOU,PRESOU,BESOU,10,33,LAT_TMP,P_TMP,Be_TMP)
+            ! Determine geomagnetic cutoff rigidity in [GV]
+            GCR    = GEOMAGNETIC_CUTOFF_RIGIDITY( GET_XMID(I,J,L),
+     &                                            GET_YMID(I,J,L) )
 
-            ! Be_TMP = [stars/g air/s] * [0.045 atom/star] * 
-            !          [kg air] * [1e3 g/kg] = 7Be emissions [atoms/s]
-            Be_TMP  = Be_TMP * 0.045d0 * State_Met%AD(I,J,L) * 1.d3 
-                  
-            ! ADD_Be = [atoms/s] * [s] / [atom/kg] = 7Be emissions [kg]
-            ADD_Be  = Be_TMP * DTSRCE / XNUMOL_Be 
+            ! Get 7Be production from Usoskin et al., 2008
+            Be_TMP = get_7Be_prod( PHI, GCR, DEPTH )
+            
+            ! ADD_Be = [atoms/g/s] * [g] [s] / [atom/kg] = 7Be emissions
+            ! [kg]
+            ADD_Be  = Be_TMP * ( State_Met%AD(I,J,L) * 1d3 ) * 
+     &                                               DTSRCE / XNUMOL_Be 
 
-            ! Correct the strat-trop exchange of 7Be
+            ! Add into STT tracer array
             IF ( ITS_IN_THE_STRATMESO( I, J, L, State_Met ) ) THEN
-               CALL CORRECT_STE( ADD_Be )
-            ENDIF
-
-            ! Add 7Be into STT tracer array [kg]
-            IF ( Input_Opt%LNLPBL ) THEN
-
-               ! For non-local PBL mixing
-               IF ( L == 1 ) THEN
-                  EMIS_SAVE(I,J,3) = ADD_Be / DTSRCE
-               ELSE
-                  STT(I,J,L,3)     = STT(I,J,L,3) + ADD_Be
-               ENDIF
-
+               STT(I,J,L,4) = STT(I,J,L,4) + ADD_Be
             ELSE
-
-               ! For TURBDAY PBL mixing
-               STT(I,J,L,3)        = STT(I,J,L,3) + ADD_Be
-
+               STT(I,J,L,3) = STT(I,J,L,3) + ADD_Be
             ENDIF
 
             ! ND01 diag: 7Be emission [kg/s]
             IF ( ND01 > 0 .and. L <= LD01 ) THEN
-               AD01(I,J,L,3) = AD01(I,J,L,3) + ( ADD_Be / DTSRCE )
+               IF ( ITS_IN_THE_STRATMESO( I, J, L, State_Met ) ) THEN
+                  AD01(I,J,L,4) = AD01(I,J,L,4) + ( ADD_Be / DTSRCE )
+               ELSE
+                  AD01(I,J,L,3) = AD01(I,J,L,3) + ( ADD_Be / DTSRCE )
+               ENDIF
             ENDIF
          ENDDO 
          ENDDO 
@@ -942,6 +1033,313 @@
 
       END SUBROUTINE SLQ
 !EOC
+
+      function get_7Be_prod( phi, gcr, depth )
+
+      ! Arguments
+      real*8 :: get_7Be_prod ! Output, Be production rate in g cm-2 s-1
+      real*8 :: phi          ! Input, Solar modulation parameter
+      real*8 :: gcr          ! Input, geomagnetic cutoff rigidity
+      real*8 :: depth        ! Input, atmospheric depth [ g cm-2 ]
+
+      integer :: i, j, k
+
+      ! What is the closest atmospheric depth?
+      i = minloc( abs( BeProd_depth - depth ), 1 )      
+
+      ! What is the closest geomagnetic cutoff rigidity?
+      j = minloc(abs( BeProd_gcr - gcr ), 1 )
+
+      ! What is the closet solar modulation potential?
+      k = minloc(abs( BeProd_phi - phi ), 1 )
+
+      ! Return the closest Be-7 Production rate
+      get_7Be_prod = BeProd_Table( i, j, k )
+
+      ! Use smarter interpolater later
+      
+      end function get_7Be_prod
+
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+      function geomagnetic_cutoff_rigidity( lon, lat )
+      
+      ! http://www.cosmicrays.org/muon-cutoff-rigidity.php
+
+      ! Arguments
+      real*8 :: geomagnetic_cutoff_rigidity ! Output [GV]
+      real*8 :: lat, lon        ! Input, geograph coords [Degrees]
+
+      ! Internals
+      real*8 :: gmlat
+      
+      ! Get geomagnetic latitude
+      gmlat = geomag_lat( lon, lat )
+      
+      ! Use dipole approximation [Smart and Shea, 2005]
+      geomagnetic_cutoff_rigidity = 
+     &     ( 14.5d0 * ( cos( gmlat * d2r ) )**4d0 )
+      
+      end function geomagnetic_cutoff_rigidity
+
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+      function geomag_lat( lon, lat )
+      ! Returns the geomagnetic latitude for a given lat, lon and year
+      ! i.e., the latitude of the sphere with the central axis
+      !       being the Earth's geomagnetic dipole
+
+      use time_mod, only : get_year
+
+      ! Arguments
+      real*8 :: geomag_lat ! Output, geomagnetic lat   [Degrees]
+      real*8 :: lat, lon   ! Input, geographic coords  [Degrees]
+
+      ! Internal Variables
+      real*8 :: pole_lat, pole_lon
+
+      ! Get the location of the Geomagnetic North Pole (varies with time)
+      call geomagnetic_north( get_year(), pole_lat, pole_lon )
+      
+      ! Determine the Geomagnetic Latitude relative to mag. North [Radians]
+      geomag_lat = asin( sin(lat*d2r) * sin(pole_lat) +
+     &      cos(lat*d2r) * cos(pole_lat) * cos( lon*d2r - pole_lon ))
+
+      ! Convert to Degrees
+      geomag_lat = geomag_lat * r2d
+
+      end function geomag_lat
+
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+      subroutine geomagnetic_north( year, pole_lat, pole_lon )
+
+      integer,intent(in)  :: year
+      real*8,intent(out) :: pole_lat, pole_lon
+      
+      ! http://www.ngdc.noaa.gov/geomag/WMM/data/WMM2010/WMM2010_Report.pdf
+      ! http://www.ngdc.noaa.gov/geomag/GeomagneticPoles.shtml
+
+      select case ( year )
+
+         !! 2001-2005; Canadian Geologic Survey
+         case( 2001 )
+            pole_lat =  81.3;  pole_lon =  -110.8     
+         case ( 2002 )
+            pole_lat =  81.6;  pole_lon =  -111.6     
+         case ( 2003 )
+            pole_lat =  82.0;  pole_lon =  -112.4     
+         case ( 2004 )
+            pole_lat =  82.3;  pole_lon =  -113.4     
+         case ( 2005 )
+            pole_lat =  82.7;  pole_lon =  -114.4
+            
+         !! 2010; NGDC NOAA WWM2010
+         case ( 2010 )
+            pole_lat =  80.02; pole_lon =  -72.21
+
+         !! Default: Use CGS 2001 Survey
+         case default
+            pole_lat =  81.3;  pole_lon =  -110.8                 
+
+      end select
+
+      ! Output in radians
+      pole_lat = pole_lat * d2r
+      pole_lon = pole_lon * d2r
+
+      end subroutine geomagnetic_north
+
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+      function solar_modulation_potential( year, month )
+      ! Returns the solar modulation potential
+      ! Usoskin et al., 2005
+!     Heliospheric modulation of cosmic rays: Monthly reconstruction for
+!     1951-2004
+!     JOURNAL OF GEOPHYSICAL RESEARCH, VOL. 110, A12108, doi:10.1029
+!     /2005JA011250, 2005
+!     Table 3. Reconstructed Monthly Values of the Modulation Parameter
+!     phi, MVa
+
+      ! Arguments
+      real*8 :: solar_modulation_potential ! Output [MVa]
+      integer :: year, month    ! Input
+
+      integer :: yearmonth 
+      real*8  :: phi
+      
+      select case ( year )
+      case ( 2004 ) ! From Usoskin et al., 2005
+         select case ( month )
+         case ( 1 )
+            phi = 898.
+         case ( 2 )
+            phi = 764.
+         case ( 3 )
+            phi = 677.
+         case ( 4 )
+            phi = 633.
+         case ( 5 )
+            phi = 595.
+         case ( 6 )
+            phi = 596.
+         case ( 7 )
+            phi = 653.
+         case ( 8 )
+            phi = 628.
+         case ( 9 )
+            phi = 602.
+         case ( 10 )
+            phi = 514.
+         case ( 11 )
+            phi = 614.
+         case ( 12 )
+            phi = 584.
+         end select
+      case ( 2005 )
+         select case ( month )
+         case ( 1 )
+            phi = 780.
+         case ( 2 )
+            phi = 647.
+         case ( 3 )
+            phi = 616.
+         case ( 4 )
+            phi = 580.
+         case ( 5 )
+            phi = 677.
+         case ( 6 )
+            phi = 597.
+         case ( 7 )
+            phi = 625.
+         case ( 8 )
+            phi = 661.
+         case ( 9 )
+            phi = 791.
+         case ( 10 )
+            phi = 580.
+         case ( 11 )
+            phi = 535.
+         case ( 12 )
+            phi = 534.
+         end select
+      case ( 2006 )
+         select case ( month )
+         case ( 1 )
+            phi = 521.
+         case ( 2 )
+            phi = 479.
+         case ( 3 )
+            phi = 439.
+         case ( 4 )
+            phi = 435.
+         case ( 5 )
+            phi = 421.
+         case ( 6 )
+            phi = 422.
+         case ( 7 )
+            phi = 431.
+         case ( 8 )
+            phi = 429.
+         case ( 9 )
+            phi = 431.
+         case ( 10 )
+            phi = 405.
+         case ( 11 )
+            phi = 414.
+         case ( 12 )
+            phi = 457.
+         end select         
+      case ( 2007 )
+         select case ( month )
+         case ( 1 )
+            phi = 390.
+         case ( 2 )
+            phi = 403.
+         case ( 3 )
+            phi = 386.
+         case ( 4 )
+            phi = 358.
+         case ( 5 )
+            phi = 357.
+         case ( 6 )
+            phi = 356.
+         case ( 7 )
+            phi = 360.
+         case ( 8 )
+            phi = 363.
+         case ( 9 )
+            phi = 357.
+         case ( 10 )
+            phi = 355.
+         case ( 11 )
+            phi = 359.
+         case ( 12 )
+            phi = 349.
+         end select        
+      case ( 2008 )
+         select case ( month )
+         case ( 1 )
+            phi = 359.
+         case ( 2 )
+            phi = 367.
+         case ( 3 )
+            phi = 367.
+         case ( 4 )
+            phi = 362.
+         case ( 5 )
+            phi = 366.
+         case ( 6 )
+            phi = 364.
+         case ( 7 )
+            phi = 357.
+         case ( 8 )
+            phi = 355.
+         case ( 9 )
+            phi = 346.
+         case ( 10 )
+            phi = 337.
+         case ( 11 )
+            phi = 327.
+         case ( 12 )
+            phi = 327.
+         end select         
+      case ( 2009 )
+         select case ( month )
+         case ( 1 )
+            phi = 321.
+         case ( 2 )
+            phi = 322.
+         case ( 3 )
+            phi = 305.
+         case ( 4 )
+            phi = 290.
+         case ( 5 )
+            phi = 287.
+         case ( 6 )
+            phi = 292.
+         case ( 7 )
+            phi = 295.
+         case ( 8 )
+            phi = 296.
+         case ( 9 )
+            phi = 290.
+         case ( 10 )
+            phi = 283.
+         case ( 11 )
+            phi = 285.
+         case ( 12 )
+            phi = 281.
+         end select         
+      case default
+         phi = 647.
+      end select
+      
+      solar_modulation_potential = phi !647.
+      
+      end function solar_modulation_potential
+
       END MODULE RnPbBe_MOD
 
 

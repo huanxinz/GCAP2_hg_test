@@ -983,7 +983,8 @@
       !-------------------------------
       ! 210Pb and 7Be (aerosols)
       !-------------------------------
-      IF ( N == IDTPb .or. N == IDTBe7 ) THEN
+      IF ( N == IDTPb .or. N == IDTBe7 .or. 
+     &     N == IDTBe7s .or. N == IDTBe7t ) THEN
          CALL F_AEROSOL( KC, N, F, State_Met )
          ISOL = GET_ISOL( N )
 
@@ -2953,7 +2954,7 @@
       USE TRACERID_MOD,       ONLY : IDTAS,   IDTAHS,   IDTLET,  IDTBCPI 
       USE TRACERID_MOD,       ONLY : IDTOCPI, IDTBCPO,  IDTOCPO, IDTDST1 
       USE TRACERID_MOD,       ONLY : IDTDST2, IDTDST3,  IDTDST4, IDTSALA 
-      USE TRACERID_MOD,       ONLY : IDTSALC
+      USE TRACERID_MOD,       ONLY : IDTSALC, IDTBE7T,  IDTBE7S
       USE TRACERID_MOD,       ONLY : IS_Hg2,  IS_HgP
       USE TRACERID_MOD,       ONLY : IDTGLYX,   IDTMGLY,   IDTGLYC
       USE TRACERID_MOD,       ONLY : IDTSOAG,   IDTSOAM
@@ -3893,7 +3894,8 @@
          !------------------------------
          ! 210Pb and 7Be (aerosol)
          !------------------------------
-         IF ( N == IDTPb .or. N == IDTBe7 ) THEN 
+         IF ( N == IDTPb .or. N == IDTBe7 .or. 
+     &        N == IDTBe7s .or. N == IDTBe7t ) THEN 
             RAINFRAC = GET_RAINFRAC( K_RAIN, F, DT )
            
          !------------------------------
@@ -4274,7 +4276,7 @@
       USE TRACERID_MOD, ONLY : IDTAS,    IDTAHS,   IDTLET,  IDTBCPI 
       USE TRACERID_MOD, ONLY : IDTOCPI,  IDTBCPO,  IDTOCPO, IDTDST1 
       USE TRACERID_MOD, ONLY : IDTDST2,  IDTDST3,  IDTDST4, IDTSALA 
-      USE TRACERID_MOD, ONLY : IDTSALC
+      USE TRACERID_MOD, ONLY : IDTSALC,  IDTBE7T,  IDTBE7S
       USE TRACERID_MOD, ONLY : IS_Hg2,   IS_HgP
       USE TRACERID_MOD, ONLY : IDTGLYX,  IDTMGLY,  IDTGLYC
       USE TRACERID_MOD, ONLY : IDTSOAG,  IDTSOAM
@@ -4424,7 +4426,8 @@
       !------------------------------
       ! 210Pb or 7Be (aerosol)
       !------------------------------
-      IF ( N == IDTPb .or. N == IDTBe7 ) THEN
+      IF ( N == IDTPb .or. N == IDTBe7 .or. 
+     &     N == IDTBe7s .or. N == IDTBe7t ) THEN
          KIN      = .TRUE.
          WASHFRAC = WASHFRAC_FINE_AEROSOL( DT, F, PP, TK )
 
@@ -7797,7 +7800,7 @@
       USE TRACERID_MOD, ONLY : IDTAS,     IDTAHS,    IDTLET,  IDTBCPI 
       USE TRACERID_MOD, ONLY : IDTOCPI,   IDTBCPO,   IDTOCPO, IDTDST1 
       USE TRACERID_MOD, ONLY : IDTDST2,   IDTDST3,   IDTDST4, IDTSALA 
-      USE TRACERID_MOD, ONLY : IDTSALC
+      USE TRACERID_MOD, ONLY : IDTSALC,   IDTBE7T,   IDTBE7S
       USE TRACERID_MOD, ONLY : IS_Hg2,    IS_HgP
       USE TRACERID_MOD, ONLY : IDTGLYX,   IDTMGLY,   IDTGLYC
       USE TRACERID_MOD, ONLY : IDTSOAG,   IDTSOAM
@@ -7889,6 +7892,14 @@
          ELSE IF ( N == IDTBE7 ) THEN
             NSOL         = NSOL + 1
             IDWETD(NSOL) = IDTBE7
+
+         ELSE IF ( N == IDTBe7s ) THEN
+            NSOL         = NSOL + 1
+            IDWETD(NSOL) = IDTBe7s
+
+         ELSE IF ( N == IDTBe7t ) THEN
+            NSOL         = NSOL + 1
+            IDWETD(NSOL) = IDTBe7t
 
          !-----------------------------
          ! Full chemistry tracers
@@ -8517,7 +8528,7 @@
          !-----------------------
          ! Rn-Pb-Be simulation
          !-----------------------
-         NMAX = 2                                    ! 210Pb, 7Be
+         NMAX = 3                                    ! 210Pb, 7Be
 
       ELSE IF ( Input_Opt%ITS_A_MERCURY_SIM ) THEN
 

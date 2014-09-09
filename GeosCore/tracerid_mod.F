@@ -306,7 +306,7 @@
       INTEGER            :: IDTPPN,  IDTISN2,  IDTR4N2, IDTPRPE, IDTC3H8
       INTEGER            :: IDTCH2O, IDTMP,    IDTN2O5, IDTHNO4, IDTC2H6
       INTEGER            :: IDTDMS,  IDTSO2,   IDTSO4,  IDTMSA,  IDTNH3
-      INTEGER            :: IDTNH4,  IDTNIT,   IDTRN,   IDTPB,   IDTBE7
+      INTEGER            :: IDTNH4,  IDTNIT
       INTEGER            :: IDTBCPI, IDTBCPO,  IDTOCPI, IDTOCPO, IDTDST1
       INTEGER            :: IDTDST2, IDTDST3,  IDTDST4, IDTSALA, IDTSALC
       INTEGER            :: IDTHG0,  IDTHg2,  IDTHgP,  IDTAS
@@ -336,6 +336,9 @@
 
       ! Online CH4 simulation (mpayer, 1/24/12)
       INTEGER            :: IDTCH4
+
+      ! For RnPbBe simulation
+      INTEGER            :: IDTPB, IDTBE7, IDTBe7t, IDTBe7s, IDTRn
 
       ! For POPs simulation (clf, 2/11/2011)
       INTEGER            :: IDTPOPPOC,  IDTPOPPBC,   IDTPOPG
@@ -1421,6 +1424,12 @@
 
             CASE ( 'BE7' )
                IDTBE7   = N
+
+            CASE ( 'BE7T' )
+               IDTBE7T  = N
+
+            CASE ( 'BE7S' )
+               IDTBE7S  = N
 
             !--------------------------------
             ! CH3I and HCN tracers
@@ -4346,6 +4355,8 @@
       IDTRN     = 0
       IDTPB     = 0
       IDTBE7    = 0
+      IDTBE7T   = 0
+      IDTBE7S   = 0
       IDTGLYX   = 0
       IDTMGLY   = 0
       IDTBENZ   = 0

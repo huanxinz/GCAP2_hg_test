@@ -4477,6 +4477,26 @@
             XMW(NUMDEP)     = 7d-3
             AIROSOL(NUMDEP) = .TRUE. 
 
+         ELSE IF ( N == IDTBE7s ) THEN
+            NUMDEP          = NUMDEP + 1
+            NTRAIND(NUMDEP) = IDTBE7s
+            NDVZIND(NUMDEP) = NUMDEP
+            DEPNAME(NUMDEP) = '7BeS'
+            HSTAR(NUMDEP)   = 0.0d+3
+            F0(NUMDEP)      = 0.0d0
+            XMW(NUMDEP)     = 7d-3
+            AIROSOL(NUMDEP) = .TRUE. 
+
+         ELSE IF ( N == IDTBE7t ) THEN
+            NUMDEP          = NUMDEP + 1
+            NTRAIND(NUMDEP) = IDTBE7t
+            NDVZIND(NUMDEP) = NUMDEP
+            DEPNAME(NUMDEP) = '7BeT'
+            HSTAR(NUMDEP)   = 0.0d+3
+            F0(NUMDEP)      = 0.0d0
+            XMW(NUMDEP)     = 7d-3
+            AIROSOL(NUMDEP) = .TRUE. 
+
          ! NO2
          ! Replaced NOx with NO2  (mpayer, 3/14/13)
          ELSE IF ( N == IDTNO2 ) THEN
