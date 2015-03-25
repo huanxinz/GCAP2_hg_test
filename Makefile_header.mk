@@ -556,11 +556,11 @@ endif
 # Special transport settings
 #------------------------------------------------------------------------------
 
-# If not specified, default GISS advection is QUS
+# If not specified, default GISS advection is TPCORE
 ifndef QUS
 REGEXP         :=(^[Mm][Oo][Dd][Ee][Ll][Ee])
 ifeq ($(shell [[ "$(MET)" =~ $(REGEXP) ]] && echo true),true)
-USER_DEFS      += -DQUS
+USER_DEFS      += -DTPCORE # -DQUS to make QUS default
 else
 USER_DEFS      += -DTPCORE
 endif
@@ -619,6 +619,9 @@ endif
 
 # Append command to link to netCDF etc library files
 LINK           :=$(LINK) -lNcUtils $(NCL)
+
+# Add if statement for if defined
+LINK           :=$(LINK) -lGISS
 
 ###############################################################################
 ###                                                                         ###

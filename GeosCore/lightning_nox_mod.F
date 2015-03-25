@@ -1728,13 +1728,32 @@
 
 #endif
 
-      WRITE( 6,* ) 'ANN_AVG_FLASHRATE: ', ANN_AVG_FLASHRATE
-      WRITE( 6,* ) 'Unscaled: ', ANN_AVG_FLASHRATE/BETA
-      WRITE( 6,* ) 'BETA: ',BETA
-
-
       IF ( BETA .eq. 1d0 ) THEN
 
+#ifdef GISS
+         WRITE( 6,* ) 'The lightning code must be tuned for every'
+         WRITE( 6,* ) 'new climate system. Recommended method:' 
+         WRITE( 6,* ) '(1) Run present-day simulation of GCM with the'
+         WRITE( 6,* ) '    same version of the code as you are using'
+         WRITE( 6,* ) '    for whatever period you are looking at.'
+         WRITE( 6,* ) '(2) Uncomment the CALL GEOS_CHEM_STOP trap in'
+         WRITE( 6,* ) '    GeosCore/lightning_nox_mod.F, and run'
+         WRITE( 6,* ) '    GEOS-Chem for the whole period with'
+         WRITE( 6,* ) '    only lightning emissions (no transport,'
+         WRITE( 6,* ) '    chemistry, other emissions, etc.), which'
+         WRITE( 6,* ) '    is fast.'
+         WRITE( 6,* ) '(3) Calculate long-term global annual mean '
+         WRITE( 6,* ) '    lightning flash rate, FR from ND56 diagn' 
+         WRITE( 6,* ) '(4) Set BETA in GeosCore/lightning_nox_mod.F'
+         WRITE( 6,* ) '    to be:'
+         WRITE( 6,* ) '           BETA = ANN_AVG_FLASHRATE / FR    '
+         WRITE( 6,* ) '    You should expect about 6 Tg N a-1 in the'
+         WRITE( 6,* ) '    present day.'
+         WRITE( 6,* ) '(5) You may now use this BETA value for any past'
+         WRITE( 6,* ) '    or future climate scenarios that uses the'
+         WRITE( 6,* ) '    same version of the GCM code.'
+         WRITE( 6,* ) 'You may contact Lee Murray with any questions.'
+#else
          WRITE( 6,* ) 'Your model framework has not had its'
          WRITE( 6,* ) 'lightning code reprocessed for the correction'
          WRITE( 6,* ) 'to how CLDTOPS are calculated, probably due to'
@@ -1749,7 +1768,8 @@
          WRITE( 6,* ) 'at your own peril, but be aware that the'
          WRITE( 6,* ) 'magnitude and distribution of lightning may be'
          WRITE( 6,* ) 'unrealistic.'
-         
+#endif
+
          CALL GEOS_CHEM_STOP
          
       ENDIF

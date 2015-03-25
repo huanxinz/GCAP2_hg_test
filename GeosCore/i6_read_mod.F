@@ -144,11 +144,17 @@
          GEOS_DIR = TRIM( Input_Opt%GEOS_5_DIR )
          I6_STR   = 'YYYYMMDD.i6.' // GET_RES_EXT() 
 
-#elif defined( MODELE ) || defined( GCAP )
+#elif defined( GCAP )
 
          ! Strings for directory & filename
          GEOS_DIR = TRIM( Input_Opt%GISS_DIR )
          I6_STR   = 'YYYYMMDD.i6.' // GET_RES_EXT() 
+
+#elif defined( GISS )
+
+         ! Strings for directory & filename
+         GEOS_DIR = TRIM( Input_Opt%GISS_DIR )
+         I6_STR   = 'YYYYMMDD.aijh12iGCAP.nc'
 
 #endif
          
@@ -256,6 +262,9 @@
       USE FILE_MOD,           ONLY : IOERROR, FILE_EXISTS
       USE GIGC_Input_Opt_Mod, ONLY : OptInput
       USE TIME_MOD,           ONLY : EXPAND_DATE
+
+      USE m_netcdf_io_open
+      USE m_netcdf_io_close
 !
 ! !INPUT PARAMETERS: 
 !
@@ -317,11 +326,17 @@
          GEOS_DIR = TRIM( Input_Opt%GEOS_5_DIR )
          I6_FILE  = 'YYYYMMDD.i6.' // GET_RES_EXT()
 
-#elif defined( MODELE ) || defined( GCAP )
+#elif defined( GCAP )
 
          ! Strings for directory & filename
          GEOS_DIR = TRIM( Input_Opt%GISS_DIR )
          I6_FILE  = 'YYYYMMDD.i6.' // GET_RES_EXT()
+
+#elif defined( GISS )
+
+         ! Strings for directory & filename
+         GEOS_DIR = TRIM( Input_Opt%GISS_DIR )
+         I6_FILE  = 'YYYYMMDD.aijh12i' // TRIM(Input_Opt%RUNID) // '.nc'
 
 #endif
 
@@ -349,6 +364,24 @@
             CALL ERROR_STOP( 'Could not find file!', 
      &                       'OPEN_I6_FIELDS (i6_read_mod.f)' )
          ENDIF
+
+#ifdef GISS
+
+         ! Close any previously opened I-6 files
+         IF ( IU_I6 > 0 ) CALL NcCl( IU_I6 )
+
+         ! Open the A6 file
+         call NcOp_Rd( IU_I6, TRIM( PATH ) )
+
+         ! Echo info
+         WRITE( 6, 100 ) TRIM( PATH ), IU_I6
+ 100     FORMAT( '     - Opening: ', a,  ' on unit ', i6 )
+         
+         ! How many fields in the file?
+         ! ltm_temp ! Update by reading from the actual file
+         N_I6_FIELDS = 2
+
+#else
 
          ! Find a free file LUN
          IU_I6 = findFreeLUN()
@@ -439,6 +472,8 @@
             ENDIF
          ENDIF
 #endif
+
+#endif ! GISS vs. GEOS
 
       ENDIF
 
@@ -748,6 +783,10 @@
 
       USE CMN_SIZE_MOD         ! Size parameters
       USE CMN_DIAG_MOD         ! NDxx flags
+
+      USE ERROR_MOD,      ONLY : ERROR_STOP
+      USE m_netcdf_io_read
+      USE m_netcdf_io_checks
 !
 ! !INPUT PARAMETERS: 
 !
@@ -811,7 +850,9 @@
       CHARACTER(LEN=8)               :: NAME
       CHARACTER(LEN=16)              :: STAMP
       CHARACTER(LEN=255)             :: FILENAME, I6_FILE !for var. tropopause
-      INTEGER                        :: XYMD, XHMS
+      INTEGER                        :: XYMD, XHMS, ST3D(3), CT3D(3)
+      INTEGER                        :: HR, MN, TSTRT
+      REAL*4                         :: TIMES(4), DHMS
 
       !=================================================================
       ! READ_I6 begins here!
@@ -826,6 +867,48 @@
 
       ! Zero the number of I-6 fields we have already found
       NFOUND = 0
+
+#ifdef GISS 
+
+      !=================================================================
+      ! Read the I-6 fields from NetCDF files
+      !=================================================================
+
+      ! Read in time stamps and find closest time
+      IF ( Ncdoes_Var_Exist( IU_I6, 'time' ) ) THEN
+         call NcRd( TIMES, IU_I6, 'time', (/1/), (/4/) )
+         TIMES = MOD( TIMES, 24d0 )
+         HR    = FLOOR( REAL(NHMS)/10000e0 )
+         MN    = FLOOR( (NHMS-HR*10000)/100e0 )
+         DHMS  = HR + MN/60e0
+         TSTRT = MINLOC( ABS( TIMES-DHMS ), 1 )
+         !WRITE(6,*) 'I6 TSTRT=', TSTRT
+      ELSE
+         CALL ERROR_STOP( "NO TIME STAMPS IN I6 FILE", 'read_i6' )
+      ENDIF
+
+      ST3D = (/     1,     1, TSTRT /)
+      CT3D = (/ IIPAR, JJPAR,     1 /)
+
+      !--------------------------------------
+      ! PS: Surface Pressure (mb) 
+      !--------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_I6, 'PS' ) ) THEN
+         call NcRd( Q2, IU_I6, 'PS', st3d, ct3d )
+         IF ( PRESENT( PS ) ) CALL TRANSFER_2D( Q2, PS )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------------
+      ! SLP: Sea Level Pressure (mb)
+      !--------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_I6, 'SLP' ) ) THEN
+         call NcRd( Q2, IU_I6, 'SLP', st3d, ct3d )
+         IF ( PRESENT( SLP ) ) CALL TRANSFER_2D( Q2, SLP )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+#else
 
       !=================================================================
       ! Read the I-6 fields from disk
@@ -1100,7 +1183,7 @@
       ENDIF
       !======== END CASE OF VARIABLE TROPOPAUSE ================
 
-
+#endif ! GISS vs. GEOS
 
       ! Increment KDI6FLDS -- this is the # of times READ_I6 is called. 
       CALL SET_CT_I6( INCREMENT=.TRUE. )

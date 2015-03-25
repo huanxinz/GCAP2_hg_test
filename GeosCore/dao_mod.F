@@ -1309,8 +1309,8 @@ c****
 
       ! It's a land box if 50% or more of the box is covered by 
       ! land and less than 50% of the box is covered by ice
-      LAND = ( State_Met%LWI_GISS(I,J) >= 0.5d0 .and. 
-     &         State_Met%SNICE(I,J)    <  0.5d0 )
+      LAND = ( State_Met%FRLAND(I,J) >= 0.5d0 .and. 
+     &         State_Met%SNICE(I,J)   <  0.5d0 )
 
 #else
 
@@ -1395,8 +1395,8 @@ c****
 
       ! It's a water box if less than 50% of the box is
       ! covered by land and less than 50% is covered by ice
-      WATER = ( State_Met%LWI_GISS(I,J) < 0.5d0 .and. 
-     &          State_Met%SNICE(I,J)    < 0.5d0 )
+      WATER = ( (State_Met%FROCEAN(I,J)+State_Met%FRLAKE(I,J)) > 0.5d0 
+     &          .and. State_Met%SNICE(I,J)    < 0.5d0 )
 
 #else
 
@@ -1584,8 +1584,7 @@ c****
             !
             ! It's near-land if THRESH <= LWI_GISS <= 1.0 
             !---------------------------------------------------
-            IF ( State_Met%LWI_GISS(LONGI,LATJ) >  THRESH .and.
-     &           State_Met%LWI_GISS(LONGI,LATJ) <= 1.0d0 ) THEN
+            IF ( State_Met%FRLAND(LONGI,LATJ) > THRESH ) THEN
 
                ! We are in a near-land box
                NEAR = .TRUE.

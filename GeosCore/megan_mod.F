@@ -2045,11 +2045,11 @@
       ! evf, acetone update (5/24/2011)
       ACET2CARBON  =  36d0 /  58d0
 
-#if defined( GISS )
-      MTYPE = 'giss'
-#else
+!#if defined( GISS )
+!      MTYPE = 'giss'
+!#else
       MTYPE = 'geos'
-#endif
+!#endif
       
       !---------------------------------------------
       ! Read in ISOPRENE Annual Emission Factors
@@ -2234,11 +2234,11 @@
 
       ! 1x1 file name
       FILENAME = TRIM( DATA_DIR_1x1 ) //
-#if defined( GISS ) || defined( GCAP )
-     &    TRIM( MEGAN_SUBDIR ) // 'MEGANv2.1_AEF_MTP.giss.1x1'
-#else
+!#if defined( GISS ) || defined( GCAP )
+!     &    TRIM( MEGAN_SUBDIR ) // 'MEGANv2.1_AEF_MTP.giss.1x1'
+!#else
      &           'MEGAN_200510/MEGAN_AEF_MTP.'//MTYPE//'.1x1' 
-#endif
+!#endif
 
       ! Echo info
       WRITE( 6, 100 ) TRIM( FILENAME )
@@ -3069,11 +3069,11 @@
       LLFILENAME = TRIM( DATA_DIR_1x1) //
      &             'MAP_A2A_Regrid_201203/MAP_A2A_latlon_geos1x1.nc'
 
-#if defined( GISS ) || defined( GCAP ) 
-      MTYPE = 'giss'
-#else
+!#if defined( GISS ) || defined( GCAP ) 
+!      MTYPE = 'giss'
+!#else
       MTYPE = 'geos'
-#endif
+!#endif
 
       !------------------------------------------------
       ! Fraction of grid box covered by Broadleaf Trees

@@ -119,13 +119,22 @@
 !
 ! !USES:
 !
-      USE CMN_SIZE_MOD
+      USE CMN_SIZE_MOD,       ONLY : IIPAR, JJPAR, LLPAR
       USE GRID_MOD,           ONLY : ITS_A_NESTED_GRID
       USE GIGC_ErrCode_Mod
       USE GIGC_Input_Opt_Mod, ONLY : OptInput
       USE GIGC_State_Chm_Mod, ONLY : ChmState
       USE GIGC_State_Met_Mod, ONLY : MetState
       USE TPCORE_BC_MOD,      ONLY : INIT_TPCORE_BC
+      USE ERROR_MOD,          ONLY : GEOS_CHEM_STOP
+#if defined( QUS )
+      USE DIST_GRID_MOD,      ONLY : GRID, DIST_GRID, INIT_GRID
+      USE ATMDYN,             ONLY : INIT_ATMDYN
+      USE GEOM,               ONLY : GEOM_B
+      USE MODEL_COM !,          ONLY : SIG, SIGE, dSIG, byDSIG
+      USE RESOLUTION,         ONLY : PLBot, PTOP, PSFMPT
+#endif
+
 !
 ! !INPUT PARAMETERS:
 !
@@ -161,7 +170,11 @@
 !
 ! !LOCAL VARIABLES:
 !
-      LOGICAL, SAVE     :: FIRST = .TRUE.
+      LOGICAL, SAVE           :: FIRST = .TRUE.
+
+!#if defined( GISS )
+!      TYPE( DIST_GRID ), SAVE :: GRID
+!#endif
 
       !=================================================================
       ! DO_TRANSPORT begins here!
@@ -183,7 +196,15 @@
      &     ( am_I_Root, Input_Opt, RC )    
 #else
 
-#if !defined( QUS )
+#if defined( QUS )
+      ! Initiate QUS
+      CALL ALLOC_DYNAMICS( GRID )
+      CALL INIT_QUS( GRID, IIPAR, JJPAR, LLPAR )
+      CALL ALLOC_TRACER_ADV( GRID )
+      CALL ALLOC_SMOMTQ( GRID )
+      CALL ALLOC_PBL_COM( GRID )
+      CALL INIT_ATMDYN( )
+#else
       ! Initiate TPCORE
       CALL INIT_TRANSPORT                   
      &     ( am_I_Root, Input_Opt, RC )    
@@ -222,8 +243,12 @@
 
          ! Call advection code for GISS meteorology
 #if defined( QUS )
+         WRITE( 6,* ) 'Warning: QUS-driven GEOS-Chem is in beta, and'
+         WRITE( 6,* ) ' not recommended.  Remove this trap in'
+         WRITE( 6,* ) ' GeosCore/transport_mod.F at your own peril.'
+         CALL GEOS_CHEM_STOP
          CALL GISS_QUS_GLOBAL_ADV
-     &      ( am_I_Root, Input_Opt, State_Met, State_Chm, RC )
+     &      ( am_I_Root, Grid, Input_Opt, State_Met, State_Chm, RC )
 #else
          CALL GISS_GLOBAL_ADV
      &      ( am_I_Root, Input_Opt, State_Met, State_Chm, RC )
@@ -866,45 +891,56 @@
 !
 ! !IROUTINE: giss_global_adv
 !
-! !DESCRIPTION: Subroutine GISS\_GLOBAL\_ADV is the driver routine for TPCORE 
-!  with the GISS/GISS met fields.
+! !DESCRIPTION: Subroutine GISS\_QUS\_GLOBAL\_ADV is the driver routine for 
+!  TPCORE with the GISS/GISS met fields. It is based on QDYNAM and TrDYNAM
+!  in ModelE.
 !\\
 !\\
 ! !INTERFACE:
 !
-      SUBROUTINE GISS_QUS_GLOBAL_ADV( am_I_Root, Input_Opt,
+      SUBROUTINE GISS_QUS_GLOBAL_ADV( am_I_Root, Grid_Dum, Input_Opt,
      &                                State_Met, State_Chm, RC )
 !
 ! !USES:
 !
       USE ERROR_MOD,        ONLY : GEOS_CHEM_STOP, DEBUG_MSG
-
-      USE TIME_MOD,         ONLY : GET_TS_DYN
-      USE PRESSURE_MOD,     ONLY : GET_PEDGE, SIGE
-      USE PRESSURE_MOD,     ONLY : SET_FLOATING_PRESSURE
-      USE GRID_MOD,         ONLY : GET_AREA_M2
-      USE GRID_MOD,         ONLY : GET_YSIN, GET_XEDGE, GET_YMID
       USE LOGICAL_MOD,      ONLY : LPRT
-      !USE TRACER_MOD,       ONLY : STT, TCVV, N_TRACERS, TRACER_NAME
+      
+      USE PRESSURE_MOD,     ONLY : SET_FLOATING_PRESSURE
 
-      USE GEOM_GISS_MOD
-      USE QUS_MOD
-      USE DIAG_MASS_FLUX_QUS
-      USE CHEMGRID_MOD,   ONLY : GET_TPAUSE_LEVEL
+      USE DIST_GRID_MOD,    ONLY : DIST_GRID
+      USE ATMDYN,           ONLY : DYNAM
+      USE DYNAMICS,         ONLY : PUA, PVA, SDA
+      USE CONSTANT,         ONLY : grav,bygrav,kg2mb,mb2kg
+      
+      USE CHEMGRID_MOD,     ONLY : GET_TPAUSE_LEVEL
 
-      USE CMN_SIZE_MOD         ! Size parameters
-      USE CMN_DIAG_MOD         ! NDxx flags
-      USE CMN_GCTM_MOD         ! Physical constants
+!     USE CMN_SIZE_MOD         ! Size parameters
+!     USE CMN_DIAG_MOD         ! NDxx flags
+
+      USE MODEL_COM, only : im,jm,lm,dt,byim,itime,zatmo
+      !USE SOMTQ_COM, only : qmom
+      !USE DIAG_COM, only: agc=>agc_loc
+      !USE GCDIAG, only : jl_totntlh,jl_zmfntlh,jl_totvtlh,jl_zmfvtlh
+      USE DYNAMICS, only: ps,mb,ma,sda
+      !USE TRACER_COM, only: itime_tr0,trm,trmom,trname,t_qlimit,ntm
+      USE TRACER_ADV, only:
+     *    AADVQ,AADVQ0,sbf,sbm,sfbm,scf,scm,sfcm,safv,sbfv,ncyc
+      USE DOMAIN_DECOMP_1D, only : grid, GET, halo_update, south, north
+      USE RESOLUTION, only : ptop
 
       USE GIGC_ErrCode_Mod
       USE GIGC_Input_Opt_Mod, ONLY : OptInput
       USE GIGC_State_Chm_Mod, ONLY : ChmState
       USE GIGC_State_Met_Mod, ONLY : MetState
 
+      USE TIME_MOD,           ONLY : GET_TS_DYN
+
 !
-      LOGICAL,        INTENT(IN)    :: am_I_Root   ! Are we on the root CPU?
-      TYPE(OptInput), INTENT(IN)    :: Input_Opt   ! Input Options object
-      TYPE(MetState), INTENT(IN)    :: State_Met   ! Meteorology State object
+      LOGICAL,         INTENT(IN)   :: am_I_Root   ! Are we on the root CPU?
+      TYPE(DIST_GRID), INTENT(IN)   :: Grid_Dum    ! Grid Definitions
+      TYPE(OptInput),  INTENT(IN)   :: Input_Opt   ! Input Options object
+      TYPE(MetState),  INTENT(IN)   :: State_Met   ! Meteorology State object
 !
 ! !INPUT/OUTPUT PARAMETERS:
 !
@@ -926,218 +962,186 @@
 
       INTEGER :: N_TRACERS
       REAL*8  :: TCVV(Input_Opt%N_TRACERS)
-
+      
       REAL*8  :: dT_DYN
-
-      REAL*8  :: FQU(IIPAR,JJPAR), FQV(IIPAR,JJPAR)
-
-      REAL*8  :: PIJLm(IIPAR,JJPAR,LLPAR)
-      REAL*8  :: PIJL1(IIPAR,JJPAR,LLPAR)
       
-      REAL*8  :: PHIS(IIPAR,JJPAR)
-      REAL*8  :: U(IIPAR,JJPAR,LLPAR)
-      REAL*8  :: V(IIPAR,JJPAR,LLPAR)
+      REAL*8  :: SUM_B(Input_Opt%N_TRACERS)
+      REAL*8  :: SUM_A(Input_Opt%N_TRACERS)
+      REAL*8  :: P_TP1(IM,JM), P_TP2(IM,JM), P_TP2B(IM,JM)
 
-      REAL*8  :: MEnd(IIPAR,JJPAR,LLPAR)
-      REAL*8  :: MInit(IIPAR,JJPAR,LLPAR)
-      REAL*8  :: MMid(IIPAR,JJPAR,LLPAR)
-      REAL*8  :: SUM_B, SUM_A
+      REAL*8, POINTER :: STT(:,:,:,:) ! All Tracers Pointer
+      REAL*8, POINTER :: TrM(:,:,:)   ! Single Tracer Pointer
+      REAL*8          :: TrMom(9,IM,JM,LM) ! Tracer Moments
 
-      REAL*8, POINTER :: STT(:,:,:,:)
-      
-      REAL*8  :: FrLoss, ncyc
-
-      REAL*8  :: TrM(IIPAR,JJPAR,LLPAR,Input_Opt%N_TRACERS) ! Tracer Mass
-      !REAL*8  :: TrMom(NMOM,IIPAR,JJPAR,LLPAR,N_TRACERS) ! Tracer Moments
+      REAL*8  :: N_DYN
+      INTEGER :: N_ITER
 
       LOGICAL, SAVE :: FIRST = .TRUE.
+
+      CHARACTER(LEN=8) :: TRNAME
+
+      REAL*8  :: DTLF,byncyc,byma
+      INTEGER :: J_0, J_1, J_0STG, J_1STG
 
       !=================================================================
       ! GISS_GLOBAL_ADV begins here!
       !=================================================================
 
+      ! Assign Pointers
+      STT => State_Chm%TRACERS(:,:,:,:)  
+
       N_TRACERS = Input_Opt%N_TRACERS
       TCVV      = Input_Opt%TCVV(1:N_TRACERS)
 
-      !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-      ! Initialize QUS
-      !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-      IF ( FIRST ) THEN
-         !dT_DYN = GET_TS_DYN() * 60d0 ! Get time step for advection [s]
-         CALL GEOM_B                  ! Initialize geometry
-         CALL AVRX                    ! Initialize polar filter
-         IF ( DIAG_MFLUX ) CALL INIT_MASS_FLUX ! Initialize mass flux diagnostic
-         ALLOCATE( TrMom(NMOM,IIPAR,JJPAR,LLPAR,N_TRACERS) )
-         TrMom = 0d0
-         ALLOCATE( TrMPrev(IIPAR,JJPAR,LLPAR,N_TRACERS) )
-         TrMPrev = 0d0
-      ENDIF
-      dT_DYN = 450d0
-      STT => State_Chm%TRACERS
+      ! Initialize
+      SUM_A = 0d0
+      SUM_B = 0d0
 
-      U    = State_Met%U
-      V    = State_Met%V
-      PHIS = State_Met%PHIS
+      ! GISS timestep [s]
+      DTLF=450d0 ! 2.*DT
 
-      !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-      ! Determine air mass @ start, mid, and end
-      !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-      CALL CALC_AMP( State_Met%PSC1, MInit  )
-      CALL CALC_AMP( State_Met%PSCm,  MMid  )
-      CALL CALC_AMP( State_Met%PSC2,  MEnd  )
+      ! GEOS-Chem dynamic timestep [s]
+      N_DYN = GET_TS_DYN() * 60
 
-      !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-      ! Determine mass flux between cells
-      !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-      ! Approximate with midpoint press. & winds
-      CALL CALC_PIJL( LLPAR,  State_Met%PSCm,  PIJLm )
-      CALL AFLUX( PHIS, U, V, PIJLm )
-      IF ( DIAG_MFLUX ) THEN
-         DIAG_PU        = DIAG_PU + PU
-         DIAG_PV        = DIAG_PV + PV
-         DIAG_SD        = DIAG_SD + SD
-         DO I=1,IIPAR
-         DO J=1,JJPAR
-            DIAG_STE(I,J) = DIAG_STE(I,J) + 
-     &           SD(I,J,GET_TPAUSE_LEVEL(I,J,State_Met))
-         ENDDO
-         ENDDO
-         DIAG_MFLUX_CNT = DIAG_MFLUX_CNT + 1d0
-      ENDIF
+      ! Get domain information
+      CALL GET(grid, J_STRT = J_0, J_STOP = J_1,
+     &               J_STRT_STGR = J_0STG, J_STOP_STGR = J_1STG)
 
-      !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-      ! Adust mass flux with pressure fixer
-      !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-      !CALL PFIX_QUS( PSC1, PSCm, PSC2, dT_DYN )
-
-      ! Initial conditions are from start of time step
-      MB = MInit
-
-      DO N=1,N_TRACERS
-
-         !WRITE(6,*) 'Advecting ',N,TRIM(Input_Opt%Tracer_Name(N)),TCVV(N)
-
+      !=================================================================
+      ! Get surface pressure
+      !=================================================================
 !$OMP PARALLEL DO
 !$OMP+DEFAULT( SHARED )
-!$OMP+PRIVATE( I, J, L )
-         DO L=1,LLPAR
-         DO J=1,JJPAR
-         DO I=1,IIPAR
-            TrM(I,J,L,N) = STT(I,J,L,N)
-         ENDDO
-         ENDDO
-         ENDDO
-!$OMP END PARALLEL DO
+!$OMP+PRIVATE( I, J )
+      DO J = J_0, J_1
+      DO I = 1, IM
 
-      !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-      ! Fill in the poles
-      !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-!$OMP PARALLEL DO
-!$OMP+DEFAULT( SHARED )
-!$OMP+PRIVATE( I, L, M )
-      DO L=1,LLPAR
-         DO I=2,IIPAR
-           TrM(I,    1,L,N) = TrM(1,    1,L,N)
-           TrM(I,JJPAR,L,N) = TrM(1,JJPAR,L,N)
-           DO M=1,NMOM
-             TrMom(M,I,    1,L,N) = TrMom(M,1,    1,L,N)
-             TrMom(M,I,JJPAR,L,N) = TrMom(M,1,JJPAR,L,N)
-           ENDDO
-         ENDDO
+         ! Surface pressure - PTOP at start of dynamic timestemp [hPa]
+         P_TP1(I,J) = State_Met%PSC1(I,J) - PTOP
+
+         ! Surface pressure - PTOP at end of dynamic timestep [hPa]
+         P_TP2(I,J) = State_Met%PSC2(I,J) - PTOP
+
+         ! Surface pressure at end of dynamic timestep [hPa]
+         P_TP2B(I,J) = State_Met%PSC2(I,J)
+
+      ENDDO
       ENDDO
 !$OMP END PARALLEL DO
 
-      !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+!     !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+!     ! Determine mass flux between cells
+!     !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+!     ! Approximate with midpoint press. & winds
+!     CALL CALC_PIJL( LLPAR,  State_Met%PSCm,  PIJLm )
+!     CALL AFLUX( PHIS, U, V, PIJLm )
+!     IF ( DIAG_MFLUX ) THEN
+!        DIAG_PU        = DIAG_PU + PU
+!        DIAG_PV        = DIAG_PV + PV
+!        DIAG_SD        = DIAG_SD + SD
+!        DO I=1,IIPAR
+!        DO J=1,JJPAR
+!           DIAG_STE(I,J) = DIAG_STE(I,J) + 
+!    &           SD(I,J,GET_TPAUSE_LEVEL(I,J,State_Met))
+!        ENDDO
+!        ENDDO
+!        DIAG_MFLUX_CNT = DIAG_MFLUX_CNT + 1d0
+!     ENDIF
+!
+!     !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+!     ! Adust mass flux with pressure fixer
+!     !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+!     ! CALL PFIX_QUS( PSC1, PSCm, PSC2, dT_DYN )
+
+      !==========================================================
+      ! Fill the QUS mass flux arrays with those from disk
+      !==========================================================
+
+      ! Get grid box mass before transport (MB)
+      CALL CALC_AMP( P_TP1, MB )
+      CALL HALO_UPDATE(grid, MB, FROM=SOUTH+NORTH) ! for convenience later
+
+      ! Use archived meteorology
+      PUA   = State_Met%PUA  / 1d0 ! 30min / 6h
+      PVA   = State_Met%PVA  / 1d0
+      SDA   = -State_Met%SDA  / 1d0
+      PS    = State_Met%PSCM
+
+      CALL AADVQ0 (1._8)  ! uses the fluxes pua,pva,sda
+
+      !WRITE(6,*) 'PUA', PUA(:,45,1)
+      !WRITE(6,*) 'PVA', PVA(:,45,1)
+      !WRITE(6,*) 'SDA', SDA(:,45,1)
+
+      WRITE(6,*) 'NCYC: ',NCYC
+
+      !==========================================================
       ! Convert from concentration (v/v) to mass units (mb m2)
-      !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+      !==========================================================
 !$OMP PARALLEL DO
 !$OMP+DEFAULT( SHARED )
-!$OMP+PRIVATE( I, J, L )
-         DO L=1,LLPAR
-         DO J=1,JJPAR
-         DO I=1,IIPAR
-            TrM(I,J,L,N)     = TrM(I,J,L,N) * MB(I,J,L) / TCVV(N)
-            TrMom(:,I,J,L,N) = TrMom(:,I,J,L,N) * MB(I,J,L) / TCVV(N)
-         ENDDO
-         ENDDO
-         ENDDO
+!$OMP+PRIVATE( N, I, J, L )
+      DO N=1,N_TRACERS
+      DO L=1,LM
+      DO J=J_0,J_1
+      DO I=1,IM
+         STT(I,J,L,N) = STT(I,J,L,N) * MB(I,J,L) / TCVV(N)
+      ENDDO; ENDDO; ENDDO; ENDDO
 !$OMP END PARALLEL DO
 
-         ! Adjust moments if necessary reflecting possible changes
-         ! that may have happened in chemistry, deposition, etc. since
-         ! the last time this routine was called.
-         IF ( .not. FIRST ) THEN
-         ! Moments are adjusted following Gavin Schmidt's guidelines in
-         ! http://www.giss.nasa.gov/staff/gschmidt/slopes.ps
-         ! i.e., only change moments for loss of tracer, to prevent instability
-         ! A true solution would be very involved, and moments of
-         ! some tracers would effect others.
+      !==========================================================
+      ! Advect Tracers
+      !==========================================================
+      ! Try to parallelize across tracers in future. This will require
+      ! editing the ModelE routines.
 !!$OMP PARALLEL DO
-!!$OMP+DEFAULT( SHARED )
-!!$OMP+PRIVATE( I, J, L, FrLoss )
-!            DO L=1,LLPAR
-!            DO J=1,JJPAR
-!            DO I=1,IIPAR
-!               FrLoss = ( TrM(I,J,L,N) - TrMPrev(I,J,L,N) ) /
-!     &              ( TrMPrev(I,J,L,N) + 1d-30 ) ! avoid div by zero
-!               IF ( FrLoss .gt. 0 ) THEN
-!                  FrLoss = min(1d0,FrLoss)
-!                  TrMom(1:nmom,I,J,L,N) = 
-!     &                 TrMom(1:nmom,I,J,L,N)*(1d0-FrLoss)
-!               ENDIF
-!            ENDDO
-!            ENDDO
-!            ENDDO
+!!$OMP+DEFAULT( PRIVATE )
+      DO N=1,N_TRACERS
+
+         ! Assign Pointer
+         TrM => STT(:,:,:,N)
+
+         ! Initialize Moments
+         TrMom = 0d0 ! Reset moments since we do not follow elsewhere
+
+         ! Zero Diagnostic arrays
+         !sfbm = 0.; sbm = 0.; sbf = 0.
+         !sfcm = 0.; scm = 0.; scf = 0.
+         !safv = 0.; sbfv = 0.
+
+         ! Sum of tracer before advection [kg] -> [Tg]
+         SUM_B(N) = SUM( TrM ) * 1d2 * bygrav * 1e-9 / TCVV(N)
+
+         WRITE( TRNAME, '(A8)' ) Input_Opt%TRACER_NAME(N)         
+
+         ! Advect tracers
+         CALL AADVQ ( TrM, TrMOM, .true., TRNAME )
+         
+         ! Sum of tracer before advection [kg] -> [Tg]
+         SUM_A(N) = SUM( TrM ) * 1d2 * bygrav * 1e-9 / TCVV(N)
+
+         ! Free pointer
+         NULLIFY( TrM )
+
+      ENDDO
 !!$OMP END PARALLEL DO
-         ENDIF            
 
-         ! Sum of tracer before advection [kg]
-         SUM_B = SUM( TrM(:,:,:,N) ) * 1d2 / g0
-
-         MA = MInit
-
-         ! G-C transport timestep is 30 min
-         ! GISS dynamics timestep is 7.5 min
-         ! Solve over 450 seconds 4 times.
-         do t=1,4
-            CALL AADVT( MA, TrM(:,:,:,N), TrMom(:,:,:,:,N), 
-     &           SD, PU, PV, dT_DYN, .true., fqu, fqv, N )
-         enddo
-
-         ! Sum of tracer before advection [kg]
-         SUM_A = SUM( TrM(:,:,:,N) ) * 1d2 / g0
-
-! Convert from mass units (mb m2) to concentration (v/v)
+      !==========================================================
+      ! Convert from mass units (mb m2) to concentration (v/v)
+      !==========================================================
+      CALL CALC_AMP( P_TP2, MA )
 !$OMP PARALLEL DO
 !$OMP+DEFAULT( SHARED )
-!$OMP+PRIVATE( I, J, L )
-         DO L=1,LLPAR
-         DO J=1,JJPAR
-         DO I=1,IIPAR
-            ! Convert from mass units (mb m2) to concentration (v/v)
-            TrM(I,J,L,N)     = TrM(I,J,L,N) * TCVV(N) / MA(I,J,L)
-            TrMom(:,I,J,L,N) = TrMom(:,I,J,L,N) * TCVV(N) / MA(I,J,L)
-
-            ! Put back into STT
-            STT(I,J,L,N) = TrM(I,J,L,N)
-
-            ! Archive state
-            TrMPrev(I,J,L,N) = TrM(I,J,L,N)
-
-         ENDDO
-         ENDDO
-         ENDDO
+!$OMP+PRIVATE( N, I, J, L )
+      DO N=1,N_TRACERS
+      DO L=1,LM
+      DO J=J_0,J_1
+      DO I=1,IM
+         BYMA = 1.D0/MA(I,J,L)
+         STT(I,J,L,N) = STT(I,J,L,N) * BYMA * TCVV(N)
+         !TrMPrev(I,J,L,N) = TrM(I,J,L) ! Archive previous state
+      ENDDO; ENDDO; ENDDO; ENDDO
 !$OMP END PARALLEL DO
-
-!      Check mass conservation
-!      QUS has excellent mass conservation (within 1e-12%).
-         IF ( .FALSE. ) THEN
-            WRITE(6,'(A,A,E9.1,A,E9.1,A,E9.1)'),State_Chm%Trac_Name(N),
-     &           'Before: ',SUM_B,' After: ',SUM_A,
-     &           ' %:',1d2*(SUM_A-SUM_B)/SUM_B
-         ENDIF
-         
-      ENDDO ! Tracer
       
       !=================================================================
       ! Reset surface pressure and ensure mass conservation
@@ -1145,13 +1149,22 @@
 
       ! Reset the floating surface pressure with the "true"
       ! surface pressure at the end of the dynamic timestep.
-      CALL SET_FLOATING_PRESSURE( State_Met%PSC2 )
+      CALL SET_FLOATING_PRESSURE( P_TP2B )
 
       FIRST = .FALSE.
 
-      !### Debug
-      IF ( LPRT ) CALL DEBUG_MSG( '### GISS_QUS_GLOB_ADV: a TPCORE' ) 
-
+      ! QUS has excellent mass conservation (within 1e-12%).
+      IF ( .FALSE. ) THEN
+         DO N=1,N_TRACERS
+            WRITE(6,'(A,A,E9.1,A,E9.1,A,E9.1)'),State_Chm%Trac_Name(N),
+     &           'Before: ',SUM_B(N),'Tg After: ',SUM_A(N),
+     &           'Tg %:',1d2*(SUM_A(N)-SUM_B(N))/SUM_B(N)
+         ENDDO
+      ENDIF
+ 
+       !### Debug
+      IF ( LPRT ) CALL DEBUG_MSG( '### GISS_QUS_GLOB_ADV: a AADVQ' ) 
+      
       ! Free Pointers
       NULLIFY(STT)
 

@@ -884,6 +884,7 @@
          DO J = 1, JJPAR
          DO I = 1, IIPAR
 
+            ! Tropospheric decay %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             ! Amount of 7Be lost to decay [kg]
             Be_LOST = STT(I,J,L,3) * ( 1d0 - EXP_Be )
 
@@ -894,6 +895,20 @@
 
             ! Subtract amount of 7Be lost to decay from STT [kg]
             STT(I,J,L,3) = STT(I,J,L,3) - Be_LOST
+
+
+            ! Stratospheric decay %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            ! Amount of 7Be lost to decay [kg]
+            Be_LOST = STT(I,J,L,4) * ( 1d0 - EXP_Be )
+
+            ! ND02 diag: 7Be lost to decay [kg/s]
+            IF ( ND02 > 0 ) THEN
+               AD02(I,J,L,4) = AD02(I,J,L,4) + ( Be_LOST / DTCHEM )
+            ENDIF
+
+            ! Subtract amount of 7Be lost to decay from STT [kg]
+            STT(I,J,L,4) = STT(I,J,L,4) - Be_LOST
+
          ENDDO
          ENDDO
          ENDDO

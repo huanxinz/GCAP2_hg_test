@@ -320,6 +320,7 @@ CONTAINS
     !======================================================================
     ! Loop over all GEOS-CHEM GRID BOXES and initialize variables
     !======================================================================
+#ifndef GISS
     !$OMP PARALLEL DO                                                  &
     !$OMP DEFAULT( SHARED )                                            &
     !$OMP PRIVATE( I,        J,         xedgeC_w, yedgeC_s, xedgeC_e ) &
@@ -328,6 +329,7 @@ CONTAINS
     !$OMP PRIVATE( xedge_e,  yedge_n,   area,     type,     maxIuse  ) &
     !$OMP PRIVATE( sumIUse,  uniqOlson, C,        IG                 ) &
     !$OMP SCHEDULE( DYNAMIC )
+#endif
     DO J = 1, JJPAR
     DO I = 1, IIPAR
 
@@ -529,8 +531,10 @@ CONTAINS
 
     ENDDO
     ENDDO
+#ifndef GISS
     !$OMP END PARALLEL DO
-  
+#endif
+
 !### Save code here for debugging
 !###    do j = 1, jjpar
 !###    do i = 1, iipar
@@ -542,13 +546,14 @@ CONTAINS
 !###    enddo
 !###    enddo
 !###   
-!###    ! ### DEBUG OUTPUT
-!###    C = mapping(23,34)%count
-!###    print*, '### count   : ', C
-!###    print*, '### II      : ', mapping(23,34)%II(1:C)
-!###    print*, '### JJ      : ', mapping(23,34)%JJ(1:C)
-!###    print*, '### area    : ', mapping(23,34)%area(1:C)
-!###    print*, '### sumarea : ', mapping(23,34)%sumarea
+!###
+!### ! ### DEBUG OUTPUT
+!### C = mapping(1,90)%count
+!### print*, '### count   : ', C
+!### print*, '### II      : ', mapping(1,90)%II(1:C)
+!### print*, '### JJ      : ', mapping(1,90)%JJ(1:C)
+!### print*, '### area    : ', mapping(1,90)%area(1:C)
+!### print*, '### sumarea : ', mapping(1,90)%sumarea
 
   END SUBROUTINE Compute_Olson_LandMap
 !EOC

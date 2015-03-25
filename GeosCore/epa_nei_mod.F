@@ -1220,8 +1220,8 @@
 
       ! Weekday biofuel file name
 #if defined( MODELE )
-      FILENAME = TRIM( DATA_DIR_1x1 )                     // 
-     &           'EPA_NEI_200411/wkday_avg_bf.YYYYMM.geos.1x1'
+      FILENAME = TRIM( DATA_DIR )                         // 
+     &           'EPA_NEI_200411/wkday_avg_bf.YYYYMM.geos.2x25'
 #else
       FILENAME = TRIM( DATA_DIR )                         // 
      &           'EPA_NEI_200411/wkday_avg_bf.YYYYMM.'    //
@@ -1256,8 +1256,8 @@
 
       ! Weekend biofuel file name
 #if defined( MODELE )
-      FILENAME = TRIM( DATA_DIR_1x1 )                     //
-     &           'EPA_NEI_200411/wkend_avg_bf.YYYYMM.geos.1x1'
+      FILENAME = TRIM( DATA_DIR )                         //
+     &           'EPA_NEI_200411/wkend_avg_bf.YYYYMM.geos.2x25'
 #else
       FILENAME = TRIM( DATA_DIR )                         // 
      &           'EPA_NEI_200411/wkend_avg_bf.YYYYMM.'    //
@@ -1505,18 +1505,18 @@
             READ( IU_FILE, IOSTAT=IOS ) 
      &           ( ( ( ARRAY1x1(I,J,L), I=1,NI ), J=1,NJ ), L=1,NL )
             LLFILENAME = TRIM( DATA_DIR_1x1) //
-     &           'MAP_A2A_Regrid_201203/latlon_geos1x1.nc'
+     &           'MAP_A2A_Regrid_201203/MAP_A2A_latlon_geos1x1.nc'
             ARRAY1x1DBLE = ARRAY1x1
             CALL DO_REGRID_A2A( LLFILENAME,
      &           NI, NJ, ARRAY1x1DBLE, ARRAYDBLE, 
      &           IS_MASS=0, NetCDF=.TRUE. )
 
          ELSE IF ( NI .eq. 144 ) THEN
-            ! Input file in GEOS 2x25
+            ! Input file is GEOS 2x25
             READ( IU_FILE, IOSTAT=IOS ) 
      &           ( ( ( ARRAY2x25(I,J,L), I=1,NI ), J=1,NJ ), L=1,NL )
             LLFILENAME = TRIM( DATA_DIR_1x1) //
-     &           'MAP_A2A_Regrid_201203/latlon_geos2x25.nc'
+     &           'MAP_A2A_Regrid_201203/MAP_A2A_latlon_geos2x25.nc'
             ARRAY2x25DBLE = ARRAY2x25
             CALL DO_REGRID_A2A( LLFILENAME,
      &                          NI, NJ, ARRAY2x25DBLE, ARRAYDBLE, 
@@ -1857,7 +1857,7 @@
 
       ! Regrid US map to our resolution
       LLFILENAME = TRIM( DATA_DIR_1x1) //
-     &     'MAP_A2A_Regrid_201203/latlon_geos1x1.nc'
+     &     'MAP_A2A_Regrid_201203/MAP_A2A_latlon_geos1x1.nc'
       ARRAY1x1DBLE = ARRAY1x1
       CALL DO_REGRID_A2A( LLFILENAME,
      &     360, 181, ARRAY1x1DBLE, USA_MASK, IS_MASS=0, NetCDF=.TRUE. )

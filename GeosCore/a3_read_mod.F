@@ -336,6 +336,10 @@
       USE FILE_MOD,           ONLY : IOERROR,    FILE_EXISTS
       USE GIGC_Input_Opt_Mod, ONLY : OptInput
       USE TIME_MOD,           ONLY : EXPAND_DATE
+
+      ! netCDF routines
+      USE m_netcdf_io_open
+      USE m_netcdf_io_close
 !
 ! !INPUT PARAMETERS: 
 !
@@ -381,7 +385,7 @@
       INTEGER            :: IOS
       CHARACTER(LEN=2)   :: DUM
       CHARACTER(LEN=8)   :: IDENT
-      CHARACTER(LEN=255) :: A3_FILE
+      CHARACTER(LEN=255) :: A3_FILE !, A3R_FILE
       CHARACTER(LEN=255) :: GEOS_DIR
       CHARACTER(LEN=255) :: PATH
 
@@ -410,11 +414,17 @@
          GEOS_DIR = TRIM( Input_Opt%GEOS_5_DIR )
          A3_FILE  = 'YYYYMMDD.a3.' // GET_RES_EXT()
 
-#elif defined( MODELE ) || defined( GCAP )
+#elif defined( GCAP )
 
          ! Strings for directory & filename
          GEOS_DIR = TRIM( Input_Opt%GISS_DIR )
          A3_FILE  = 'YYYYMMDD.a3.' // GET_RES_EXT()
+
+#elif defined( GISS )
+
+         ! Strings for directory & filename
+         GEOS_DIR = TRIM( Input_Opt%GISS_DIR )
+         A3_FILE  = 'YYYYMMDD.aijh6' // TRIM(Input_Opt%RUNID) // '.nc'
 
 #endif
 
@@ -433,47 +443,24 @@
      &             TRIM( A3_FILE            )
          ENDIF
 
-         ! Close previously opened A-3 file
-	 INQUIRE( IU_A3, OPENED=IS_OPEN )
-         IF( IS_OPEN ) CLOSE( IU_A3 )
+         ! Close any previously opened A-3 files
+         IF ( IU_A3 > 0 ) CALL NcCl( IU_A3 )
 
-         ! Make sure the file unit is valid before we open the file
-         IF ( .not. FILE_EXISTS( IU_A3 ) ) THEN
-            CALL ERROR_STOP( 'Could not find file!', 
-     &                       'OPEN_A3_FIELDS (a3_read_mod.f)' )
-         ENDIF
-
-         ! Find a free file LUN
-         IU_A3 = findFreeLUN( IU_A3 )
+         ! Open the A3 file
+         call NcOp_Rd( IU_A3, TRIM( PATH ) )
 
          ! Pass the value of IU_A3 to back to the calling routine
          IF ( PRESENT( IUNIT ) ) THEN
             IUNIT = IU_A3
          ENDIF
 
-         ! Open the A3 file
-         OPEN( UNIT   = IU_A3,         FILE   = TRIM( PATH ),
-     &         STATUS = 'OLD',         ACCESS = 'SEQUENTIAL',  
-     &         FORM   = 'UNFORMATTED', IOSTAT = IOS )
-               
-         IF ( IOS /= 0 ) THEN
-            CALL IOERROR( IOS, IU_A3, 'open_a3_fields:1' )
-         ENDIF
-
          ! Echo info
          WRITE( 6, 100 ) TRIM( PATH ), IU_A3
- 100     FORMAT( '     - Opening: ', a,  ' on unit ', i4 )
-         
-         ! Skip past the ident string
-         READ( IU_A3, IOSTAT=IOS ) IDENT
+ 100     FORMAT( '     - Opening: ', a,  ' on unit ', i6 )
 
-         IF ( IOS /= 0 ) THEN
-            CALL IOERROR( IOS, IU_A3, 'open_a3_fields:2' )
-         ENDIF
-
-         ! The last 2 digits of the ident string
-         ! is the # of fields contained in the file
-         READ( IDENT(7:8), '(i2.2)' ) N_A3_FIELDS        
+!         ! How many fields in the file?
+!         ! ltm_temp ! Update by reading from the actual file
+!         N_A3_FIELDS = 14
         
       ENDIF
 
@@ -633,7 +620,7 @@
      &              FRLAKE   = State_Met%FRLAKE,     
      &              FRLANDIC = State_Met%FRLANDIC )
 
-#elif defined( MODELE ) || defined( GCAP )
+#elif defined( GISS ) || defined( GCAP )
 
       !================================================================
       ! For GISS-driven simulations, read the following fields:
@@ -826,6 +813,11 @@
 
       USE CMN_SIZE_MOD                         ! Size parameters
       USE CMN_DIAG_MOD                         ! ND67
+
+      USE ERROR_MOD,    ONLY : ERROR_STOP
+      USE m_netcdf_io_read
+      USE m_netcdf_io_checks
+
 !
 ! !INPUT PARAMETERS: 
 !
@@ -937,10 +929,10 @@
 ! !LOCAL VARIABLES:
 !
       INTEGER           :: I, IJLOOP, IOS, J, N_A3, NFOUND 
-      REAL*4            :: Q2(IIPAR,JJPAR)
+      REAL*4            :: Q2(IIPAR,JJPAR), TIMES(8), DHMS
       CHARACTER(LEN=8)  :: NAME
       CHARACTER(LEN=16) :: STAMP
-      INTEGER           :: XYMD, XHMS
+      INTEGER           :: XYMD, XHMS, ST3D(3), CT3D(3), TSTRT, HR, MN
 
       !=================================================================
       ! READ_A3 begins here!      
@@ -955,6 +947,173 @@
 
       ! Zero the number of A-3 fields that we have found
       NFOUND = 0
+
+#if   defined( GISS )
+
+      ! Read in time stamps and find closest time
+      IF ( Ncdoes_Var_Exist( IU_A3, 'time' ) ) THEN
+         call NcRd( TIMES, IU_A3, 'time', (/1/), (/8/) )
+         ! The units are hours since the start of the run.
+         ! Assume that it always started at 0 UTC.
+         TIMES = MOD( TIMES, 24d0 )
+         HR    = FLOOR( REAL(NHMS)/10000e0 )
+         MN    = FLOOR( (NHMS-HR*10000)/100e0 )
+         DHMS  = HR + MN/60e0
+         TSTRT = MINLOC( ABS( TIMES-DHMS ), 1 )
+         !WRITE(6,*) 'A3 TSTRT=', TSTRT
+      ELSE
+         CALL ERROR_STOP( "NO TIME STAMPS IN A3 FILE", 'read_a3' )
+      ENDIF
+
+      ST3D = (/     1,     1, TSTRT /)
+      CT3D = (/ IIPAR, JJPAR,     1 /)
+
+      !------------------------------------------
+      ! ALBEDO: surface albedo (fraction)
+      !------------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A3, 'ALBEDO' ) ) THEN
+         call NcRd( Q2, IU_A3, 'ALBEDO', st3d, ct3d )
+         IF ( PRESENT( ALBEDO ) ) CALL TRANSFER_2D( Q2, ALBEDO )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------
+      ! GWETTOP: topsoil wetness 
+      !--------------------------------
+      ! soil = FRACTION OF SOIL WATER (fraction)
+      IF ( Ncdoes_Var_Exist ( IU_A3, 'SOIL' ) ) THEN
+         call NcRd( Q2, IU_A3, 'SOIL', st3d, ct3d )
+         IF ( PRESENT( GWETTOP ) ) CALL TRANSFER_2D( Q2, GWETTOP )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------
+      ! MOLENGTH: Monin-Obukhov Length (m)
+      !--------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A3, 'MOLENGTH' ) ) THEN
+         call NcRd( Q2, IU_A3, 'MOLENGTH', st3d, ct3d )
+         IF ( PRESENT( MOLENGTH ) ) CALL TRANSFER_2D( Q2, MOLENGTH )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------
+      ! OICE: Frac of ocean and lake ice (fraction)
+      !--------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A3, 'OICE' ) ) THEN
+         call NcRd( Q2, IU_A3, 'OICE', st3d, ct3d )
+         IF ( PRESENT( OICE ) ) CALL TRANSFER_2D( Q2, OICE )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------
+      ! PARDF: photosyn active diff rad (W/m2)
+      !--------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A3, 'PARDF' ) ) THEN
+         call NcRd( Q2, IU_A3, 'PARDF', st3d, ct3d )
+         IF ( PRESENT( PARDF ) ) CALL TRANSFER_2D( Q2, PARDF )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------
+      ! PARDR: photosyn active dir rad (W/m2)
+      !--------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A3, 'PARDR' ) ) THEN
+         call NcRd( Q2, IU_A3, 'PARDR', st3d, ct3d )
+         IF ( PRESENT( PARDR ) ) CALL TRANSFER_2D( Q2, PARDR )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------
+      ! PBL: boundary layer depth (m)
+      !--------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A3, 'PBL' ) ) THEN
+         call NcRd( Q2, IU_A3, 'PBL', st3d, ct3d )
+         IF ( PRESENT( PBL ) ) CALL TRANSFER_2D( Q2, PBL )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !------------------------------------------
+      ! PREACC: total precip at ground (mm/day)
+      !------------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A3, 'PREACC' ) ) THEN
+         call NcRd( Q2, IU_A3, 'PREACC', st3d, ct3d )
+         IF ( PRESENT( PREACC ) ) CALL TRANSFER_2D( Q2, PREACC )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !------------------------------------------
+      ! PRECON: conv precip at ground (mm/day)
+      !------------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A3, 'PRECON' ) ) THEN
+         call NcRd( Q2, IU_A3, 'PRECON', st3d, ct3d )
+         IF ( PRESENT( PRECON ) ) CALL TRANSFER_2D( Q2, PRECON )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------
+      ! RADSWG: photosyn active dir rad (W/m2)
+      !--------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A3, 'RADSWG' ) ) THEN
+         call NcRd( Q2, IU_A3, 'RADSWG', st3d, ct3d )
+         IF ( PRESENT( RADSWG ) ) CALL TRANSFER_2D( Q2, RADSWG )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------
+      ! SNICE: Frac of snow/ice (fraction)
+      !--------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A3, 'SNICE' ) ) THEN
+         call NcRd( Q2, IU_A3, 'SNICE', st3d, ct3d )
+         IF ( PRESENT( SNICE ) ) CALL TRANSFER_2D( Q2, SNICE )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------
+      ! SNOW: snow depth (m water equiv)
+      !--------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A3, 'SNOW' ) ) THEN
+         call NcRd( Q2, IU_A3, 'SNOW', st3d, ct3d )
+         IF ( PRESENT( SNOW ) ) CALL TRANSFER_2D( Q2, SNOW )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------            
+      ! TS: surface air temperature (K)
+      !--------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A3, 'TS' ) ) THEN
+         call NcRd( Q2, IU_A3, 'TS', st3d, ct3d )
+         IF ( PRESENT( TS ) ) CALL TRANSFER_2D( Q2, TS )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------            
+      ! U10M: U-wind at 10 m (m/s)
+      !--------------------------------            
+      IF ( Ncdoes_Var_Exist ( IU_A3, 'USS' ) ) THEN
+         call NcRd( Q2, IU_A3, 'USS', st3d, ct3d )
+         IF ( PRESENT( U10M ) ) CALL TRANSFER_2D( Q2, U10M )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------            
+      ! USTAR: friction velocity (m/s)
+      !--------------------------------            
+      IF ( Ncdoes_Var_Exist ( IU_A3, 'USTAR' ) ) THEN
+         call NcRd( Q2, IU_A3, 'USTAR', st3d, ct3d )
+         IF ( PRESENT( USTAR ) ) CALL TRANSFER_2D( Q2, USTAR )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------            
+      ! V10M: V-wind at 10 m (m/s)
+      !--------------------------------            
+      IF ( Ncdoes_Var_Exist ( IU_A3, 'VSS' ) ) THEN
+         call NcRd( Q2, IU_A3, 'VSS', st3d, ct3d )
+         IF ( PRESENT( V10M ) ) CALL TRANSFER_2D( Q2, V10M )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+#else
 
       !=================================================================
       ! Read the A-3 fields from disk
@@ -1502,6 +1661,7 @@
       ENDDO
 
 #endif
+#endif ! ifdef GISS
 
       !=================================================================
       ! ND67 diagnostic: A-3 surface fields:

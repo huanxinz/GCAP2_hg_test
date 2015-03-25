@@ -649,7 +649,8 @@
       USE DIRECTORY_MOD,      ONLY : GEOS_4_DIR,  GEOS_5_DIR
       USE DIRECTORY_MOD,      ONLY : MERRA_DIR,   GEOS_FP_DIR
       USE DIRECTORY_MOD,      ONLY : RUN_DIR
-      USE DIRECTORY_MOD,      ONLY : TEMP_DIR   
+      USE DIRECTORY_MOD,      ONLY : TEMP_DIR
+      USE DIRECTORY_MOD,      ONLY : RUNID
       USE GIGC_ErrCode_Mod
       USE GIGC_Input_Opt_Mod, ONLY : OptInput
       USE GRID_MOD,           ONLY : SET_XOFFSET, SET_YOFFSET
@@ -663,6 +664,16 @@
 #if defined( EXTERNAL_GRID ) || defined( EXTERNAL_FORCING )
       USE TIME_MOD,           ONLY : Accept_External_Date_Time
 #endif
+#if defined ( GISS )
+      !-----------------------------------------------------------------
+      ! Modules for the GISS-driven implementation (aka "GCAP2")
+      !-----------------------------------------------------------------
+      USE DIST_GRID_MOD,      ONLY : GRID, INIT_GRID
+      USE GEOM,               ONLY : GEOM_B
+      USE MODEL_COM,          ONLY : SIGE, SIG, DSIG, BYDSIG, LM
+      USE RESOLUTION,         ONLY : PLBOT
+#endif
+
 !
 ! !INPUT PARAMETERS:
 !
@@ -778,6 +789,11 @@
       CALL SPLIT_ONE_LINE( SUBSTRS, N, 1, 'read_simulation_menu:14' )
       READ( SUBSTRS(1:N), '(a)' ) TEMP_DIR
 
+#if   defined( GISS )
+      CALL SPLIT_ONE_LINE( SUBSTRS, N, 1, 'read_simulation_menu:14' )
+      READ( SUBSTRS(1:N), '(a)' ) RUNID
+#endif
+
       ! Unzip met fields
       CALL SPLIT_ONE_LINE( SUBSTRS, N, 1, 'read_simulation_menu:15' )
       READ( SUBSTRS(1:N), *     ) LUNZIP
@@ -866,6 +882,9 @@
       Input_Opt%MERRA_DIR     = MERRA_DIR
       Input_Opt%DATA_DIR_1x1  = DATA_DIR_1x1
       Input_Opt%TEMP_DIR      = TEMP_DIR
+#if   defined( GISS )
+      Input_Opt%RUNID         = RUNID
+#endif
       Input_Opt%LUNZIP        = LUNZIP
       Input_Opt%LWAIT         = LWAIT
       Input_Opt%LVARTROP      = LVARTROP
@@ -901,6 +920,9 @@
      &                    TRIM( DATA_DIR_1x1 )
          WRITE( 6, 110 ) 'Temporary Directory         : ', 
      &                    TRIM( TEMP_DIR )
+#if   defined( GISS )
+         WRITE( 6, 110 ) 'GISS runid                  : ', TRIM( RUNID )
+#endif
          WRITE( 6, 110 ) 'Input restart file          : ', 
      &                    TRIM( IN_RST_FILE )
          WRITE( 6, 120 ) 'Create restart file?        : ', LSVGLB
@@ -975,6 +997,25 @@
       ! Set global offsets for the horizontal grid
       CALL SET_XOFFSET( I0 )
       CALL SET_YOFFSET( J0 )
+
+#if defined ( GISS )
+
+      ! Initialize GISS grid variables
+      CALL INIT_GRID( GRID, IIPAR, JJPAR, LLPAR, CREATE_CAP=.TRUE. )
+
+      ! Initialize horizontal geometry
+      CALL GEOM_B
+
+      ! Set dependent vertical resolution variables
+      SIGE(:) = (PLbot(:)-PTOP)/PSFMPT
+      SIG(:)  = (sige(1:lm)+sige(2:lm+1))*0.5d0
+      DSIG(:) =  sige(1:lm)-sige(2:lm+1)
+      byDSIG  =  1./DSIG
+
+      ! Allocate global variables
+      CALL ALLOC_MODEL_COM( GRID )
+
+#endif
 
       ! Initialize GEOS-Chem horizontal grid structure
       CALL INITIALIZE_GEOS_GRID( am_I_Root, RC )
@@ -3134,17 +3175,17 @@
          ENDIF
       ENDIF
 
-#if    defined( GCAP ) || defined( MODELE )
+#if    defined( GCAP ) || defined( MODELE ) || defined( GISS )
 
       !--------------------------------
       ! GCAP error message 
       !--------------------------------
 
       IF ( LOTDLOC ) THEN
-            MSG = 'Lightning rescaling not available nor very ' //
+            MSG = 'Lightning rescaling not available nor ' //
      &            'appropriate for GCAP sim because of window ' // 
-     &            'of OTD/LIS satellite observations.  Select ' //
-     &            'one of the raw params without redist.'
+     &            'of OTD/LIS satellite observations. Disable OTD/LIS'//
+     &            'redistribution in input.geos to continue.'
          CALL ERROR_STOP( MSG, LOC )
        ENDIF
 
@@ -4185,6 +4226,9 @@
       !=================================================================      
       
       ! Define maximum timestep for transport
+#if   defined( QUS )
+      MAX_DYN = 30
+#else
 #if   defined( GRID4x5   ) || defined( GRIDM23 )
       MAX_DYN = 30
 #elif defined( GRID2x25  ) || defined( GRIDF40 )
@@ -4199,6 +4243,7 @@
       MAX_DYN = 5
 #elif defined( EXTERNAL_FORCING )
       MAX_DYN = 60
+#endif
 #endif
 
       ! If TS_DYN is greater than MAX_DYN, then stop w/ error

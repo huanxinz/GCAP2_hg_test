@@ -150,6 +150,7 @@ MOD     := $(ROOTDIR)/mod
 NCDF    := $(ROOTDIR)/NcdfUtil
 GTMM    := $(ROOTDIR)/GTMM
 UTIL    := $(ROOTDIR)/GeosUtil
+GISS    := $(ROOTDIR)/GISS
 GIGC    := $(ROOTDIR)/GIGC
 
 # Include header file.  This returns CC, F90, FREEFORM, LD, R8, SHELL,
@@ -207,6 +208,7 @@ lib:                                               # Build all G-C libraries
 	@$(MAKE) libnc
 	@$(MAKE) libheaders         		  
 	@$(MAKE) libkpp             		  
+	@$(MAKE) libgiss 			  
 	@$(MAKE) libutil 			  
 	@$(MAKE) libiso 			  
 	@$(MAKE) libcore			  
@@ -235,6 +237,9 @@ ncdfcheck:                                         # Check netCDF library
 libutil:                                           # Build code in GeosUtil/
 	@$(MAKE) -C $(UTIL)			  
 
+libgiss:                                           # Build code in GISS/
+	@$(MAKE) -C $(GISS)			  
+
 libheaders:                                        # Build code in Headers/ 
 	@$(MAKE) -C $(HDR)			  
 
@@ -260,6 +265,7 @@ realclean:                                         # Remove files everywhere
 	@$(MAKE) -C $(KPP) realclean
 	@$(MAKE) -C $(GTMM) clean
 	@$(MAKE) -C $(UTIL) clean
+	@$(MAKE) -C $(GISS) clean
 	@$(MAKE) -C $(HDR) clean
 	@$(MAKE) docclean
 ifeq ($(HPC),yes)
@@ -324,8 +330,8 @@ a3_read_mod.o               : a3_read_mod.F                                  \
                               diag_mod.o
 
 a6_read_mod.o               : a6_read_mod.F                                  \
-                              dao_mod.o               diag_mod.o             \
-                              geom_giss_mod.o         FFT72.o 
+                              dao_mod.o               diag_mod.o             #\
+                              #geom_giss_mod.o        FFT144.o 
 
 acetone_mod.o               : acetone_mod.F                                  \
                               diag_mod.o              megan_mod.o 
@@ -658,7 +664,9 @@ fast_jx_mod.o               : fast_jx_mod.F                                  \
                               chemgrid_mod.o          dao_mod.o              \
                               toms_mod.o
 
-FFT72.o                     : FFT72.F
+#FFT72.o                     : FFT72.F
+
+#FFT144.o                    : FFT144.F
 
 future_emissions_mod.o      : future_emissions_mod.F
 
@@ -705,7 +713,7 @@ gcap_read_mod.o             : gcap_read_mod.F                                \
 
 geia_mod.o                  : geia_mod.F
 
-geom_giss_mod.o             : geom_giss_mod.F90
+#geom_giss_mod.o             : geom_giss_mod.F90
 
 geosfp_read_mod.o           : geosfp_read_mod.F90                            \
                               dao_mod.o               diag_mod.o
@@ -964,9 +972,22 @@ pops_mod.o           	    : pops_mod.F    	                             \
 
 precipfrac.o                : precipfrac.F
 
-qus_mod.o                   : qus_mod.F90                                    \
-                              dao_mod.o               geom_giss_mod.o        \
-                              diag_mass_flux_qus.o    chemgrid_mod.o
+#qus_mod.o                   : qus_mod.F90                                    \
+#                              dao_mod.o               geom_giss_mod.o        \
+#                              diag_mass_flux_qus.o    chemgrid_mod.o
+
+QUS3D.o                     : QUS3D.F                                        
+
+QUSCOM.o                    : QUS_DRV.F                                      \
+                              DOMAIN_DECOMP_1D.o      PARAM.o
+
+QUSDEF.o                    : QUSDEF.F                                       
+
+MODEL_COM.o                 : MODEL_COM.F
+
+DOMAIN_DECOMP_1D.o          : DomainDecomposition_mod.F90
+
+PARAM.o                     : PARAM.F
 
 rcp_mod.o                   : rcp_mod.F                                      \
                               diag_mod.o              tracerid_mod.o         \
@@ -1118,8 +1139,8 @@ transport_mod.o             : transport_mod.F                                \
                               tpcore_geos5_window_mod.o                      \
                               tpcore_geosfp_window_mod.o                     \
                               pjc_pfix_geos5_window_mod.o                    \
-                              pjc_pfix_geosfp_window_mod.o                   \
-                              qus_mod.o               diag_mass_flux_qus.o  
+                              pjc_pfix_geosfp_window_mod.o                   
+#                              qus_mod.o               diag_mass_flux_qus.o  
 
 update.o                    : update.F
 

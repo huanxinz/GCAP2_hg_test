@@ -339,6 +339,9 @@
       USE FILE_MOD,           ONLY : IOERROR, FILE_EXISTS
       USE GIGC_Input_Opt_Mod, ONLY : OptInput
       USE TIME_MOD,           ONLY : EXPAND_DATE
+
+      USE m_netcdf_io_open
+      USE m_netcdf_io_close
 !
 ! !INPUT PARAMETERS: 
 !
@@ -377,7 +380,7 @@
       LOGICAL                :: IT_EXISTS, IS_OPEN
       INTEGER                :: IOS, IUNIT
       CHARACTER(LEN=8)       :: IDENT
-      CHARACTER(LEN=255)     :: A6_FILE
+      CHARACTER(LEN=255)     :: A6_FILE, MF_FILE
       CHARACTER(LEN=255)     :: GEOS_DIR
       CHARACTER(LEN=255)     :: PATH
 
@@ -400,12 +403,19 @@
          GEOS_DIR = TRIM( Input_Opt%GEOS_5_DIR )
          A6_FILE  = 'YYYYMMDD.a6.' // GET_RES_EXT()
 
-#elif defined( MODELE ) || defined( GCAP )
+#elif defined( GCAP )
 
          ! Strings for directory & filename
          GEOS_DIR = TRIM( Input_Opt%GISS_DIR )
          A6_FILE  = 'YYYYMMDD.a6.' // GET_RES_EXT()
 
+#elif defined( GISS )
+
+         ! Strings for directory & filename
+         GEOS_DIR = TRIM( Input_Opt%GISS_DIR )
+         A6_FILE  = 'YYYYMMDD.aijlh12'//TRIM(Input_Opt%RUNID)//'.nc'
+         !MF_FILE  = 'YYYYMMDD.subdd'//TRIM(Input_Opt%RUNID)//'.mflx.nc'
+         
 #endif
 
          ! Replace date tokens
@@ -422,6 +432,23 @@
      &             TRIM( GEOS_DIR           ) // 
      &             TRIM( A6_FILE            )
          ENDIF
+
+#ifdef GISS
+
+         ! Close any previously opened A-6 files
+         IF ( IU_A6 > 0 ) CALL NcCl( IU_A6 )
+
+         ! Open the A6 file
+         call NcOp_Rd( IU_A6, TRIM( PATH ) )
+
+         ! Echo info
+         WRITE( 6, 100 ) TRIM( PATH ), IU_A6
+ 100     FORMAT( '     - Opening: ', a,  ' on unit ', i6 )
+
+!         ! ltm_temp ! Update by reading from the actual file
+!         N_A6_FIELDS = 21
+
+#else
 
          ! Close previously opened A-3 file
 	 INQUIRE( IU_A6, OPENED=IS_OPEN )
@@ -466,6 +493,8 @@
          !%%% to get counted) as well as for MOISTQ, which is an extra
          !%%% derived field.  (jmao, bmy, 2/12/09)
          N_A6_FIELDS = 21
+#endif
+
 #endif
 
       ENDIF
@@ -664,6 +693,11 @@
      &                 UPDE       = State_Met%UPDE,          
      &                 UPDN       = State_Met%UPDN,  
      &                 V          = State_Met%V,
+#if defined( QUS )
+     &                 PUA        = State_Met%PUA,
+     &                 PVA        = State_Met%PVA,
+     &                 SDA        = State_Met%SDA,
+#endif
      &                 T_FULLGRID = T_FULLGRID ) 
 
       ! Create 2-D CLDFRC field from 3-D CLDF field
@@ -781,6 +815,11 @@
      &                 U          = State_Met%U,            
      &                 UPDE       = State_Met%UPDE,          
      &                 UPDN       = State_Met%UPDN,  
+#if defined( QUS )
+     &                 PUA        = State_Met%PUA,
+     &                 PVA        = State_Met%PVA,
+     &                 SDA        = State_Met%SDA,
+#endif
      &                 V          = State_Met%V )
 
       ! Create 2-D CLDFRC field from 3-D CLDF field
@@ -820,7 +859,11 @@
 ! !INPUT PARAMETERS: 
 !
       ! GCAP 3-D cloud fraction field [unitless]
+#if defined( GCAP )
+      REAL*8, INTENT(IN)  :: CLDF(IIPAR,JJPAR,LLPAR)
+#else
       REAL*8, INTENT(IN)  :: CLDF(LLPAR,IIPAR,JJPAR)
+#endif
 !
 ! !OUTPUT PARAMETERS: 
 !
@@ -854,10 +897,15 @@
       DO I = 1, IIPAR
 
          ! Take max value
+#if defined( GCAP )
+         CLDFRC(I,J) = MAXVAL( CLDF(I,J,:) )
+#else
          CLDFRC(I,J) = MAXVAL( CLDF(:,I,J) )
+#endif
 
          ! Store in ND67 diagnostic if necessary
          IF ( IS_ND67 ) AD67(I,J,10) = AD67(I,J,10) + CLDFRC(I,J)
+
       ENDDO
       ENDDO
 !$OMP END PARALLEL DO
@@ -887,8 +935,13 @@
 !
       ! References to F90 modules
       USE CMN_SIZE_MOD   ! Size parameters
-      USE GEOM_GISS_MOD  ! Geometry specific to GISS simulations
+      USE ATMDYN, ONLY : AVRX, init_ATMDYN
+      USE GEOM
+#if   defined( GRIDF40 )
+      USE FFT144
+#elif defined( GRIDM23 )
       USE FFT72
+#endif
 
       USE ERROR_MOD, ONLY : GEOS_CHEM_STOP
 
@@ -900,7 +953,6 @@
       ! Local variables
       LOGICAL, SAVE :: FIRST = .true.
 
-      REAL*8, DIMENSION(IIPAR,JJPAR,LLPAR) :: UB, VB ! winds on B grid
       REAL*8, DIMENSION(IIPAR,JJPAR,LLPAR) :: UA, VA ! winds on A grid
 
       INTEGER                    :: IMH
@@ -916,10 +968,8 @@
       ALLOCATE( AN(0:IMH) )
       ALLOCATE( BN(0:IMH) )
       IF ( FIRST ) THEN
-         CALL GEOM_B
          CALL FFT0( IIPAR )
       ENDIF
-      FIRST = .false.
 
 #if defined( QUS )
       ! Do Nothing
@@ -931,18 +981,33 @@
       UA = U
       VA = V
 
-      ! Note: the Fourier polar filter below is designed to work with the 
-      ! native GISS resolution, with the 46 latitude bands.
-      ! It probably will still improve GCAP, but technically the
-      ! damping coefficients would be different.
-
 #else
 
-      ! GISS input winds are on the GISS Arakawa B Grid
-      UB = U
-      VB = V
+      IF ( FIRST ) THEN
+         CALL init_ATMDYN
+      ENDIF
+
+      ! Apply FFT filter to reduce polar noise in U winds
+      CALL AVRX( U )
+
+!      if ( .false. ) then
+!      DO J=1,JJPAR
+!      IF ( DRAT(J) .gt. 1 ) CYCLE
+!      DO L=1,LLPAR
+!         CALL FFT( UB(:,J,L), AN, BN )
+!         DO N=NMIN(J),IMH-1
+!            AN(N) = BYSN(N) * DRAT(J) * AN(N)
+!            BN(N) = BYSN(N) * DRAT(J) * BN(N)
+!         ENDDO
+!         AN(IMH) = BYSN(IMH) * DRAT(J) * AN(IMH)
+!         CALL FFTI( AN, BN, UB(:,J,L) )
+!      ENDDO
+!      ENDDO
+!      endif
 
       ! Convert winds from Arakawa B to Arakawa A grid
+      UA = 0d0
+      VA = 0d0
       DO L=1,LLPAR
       DO I=1,IIPAR
       DO J=1,JJPAR
@@ -962,41 +1027,27 @@
      &           hemi*u(idij(k,i,j),idjj(k,j),l)*siniv(k))
          ELSE
          ! Other latitudes
-         UA(i,j,l) = UA(i,j,l) + UB(idij(k,i,j),idjj(k,j),l) * rapj(k,j)
-         VA(i,j,l) = VA(i,j,l) + VB(idij(k,i,j),idjj(k,j),l) * rapj(k,j)
+         UA(i,j,l) = UA(i,j,l) + U(idij(k,i,j),idjj(k,j),l) * rapj(k,j)
+         VA(i,j,l) = VA(i,j,l) + V(idij(k,i,j),idjj(k,j),l) * rapj(k,j)
          ENDIF
       ENDDO
       ENDDO
       ENDDO
       ENDDO
 
-#endif
-
-      ! Apply FFT filter to reduce noise in U winds, as done by the GCM
-      if ( .false. ) then
-      DO J=1,JJPAR
-      IF ( DRAT(J) .gt. 1 ) CYCLE
-      DO L=1,LLPAR
-         CALL FFT( UA(:,J,L), AN, BN )
-         DO N=NMIN(J),IMH-1
-            AN(N) = BYSN(N) * DRAT(J) * AN(N)
-            BN(N) = BYSN(N) * DRAT(J) * BN(N)
-         ENDDO
-         AN(IMH) = BYSN(IMH) * DRAT(J) * AN(IMH)
-         CALL FFTI( AN, BN, UA(:,J,L) )
-      ENDDO
-      ENDDO
-      endif
-
-      ! Output winds are on the Arakawa A grid
+      ! Output winds are on the Arakawa A grid for TPCORE
       U = UA
       V = VA
+
+#endif
 
 #endif
 ! endif not defined QUS
 
       IF ( ALLOCATED( AN ) ) DEALLOCATE( AN )
       IF ( ALLOCATED( BN ) ) DEALLOCATE( BN )
+
+      FIRST = .false.
 
       ! Return to calling program
       END SUBROUTINE MAKE_GISS_WINDS
@@ -1134,7 +1185,8 @@
      &                    Q,         QI,        QL,        RH,        
      &                    T,         TAUCLI,    TAUCLW,    U,         
      &                    UPDE,      UPDN,      V,         ZMEU,      
-     &                    ZMMD,      ZMMU,      T_FULLGRID )
+     &                    ZMMD,      ZMMU,      PUA,       PVA,
+     &                    SDA,       T_FULLGRID )
 !
 ! !USES:
 !
@@ -1146,6 +1198,10 @@
       USE TIME_MOD,     ONLY : SET_CT_A6,   TIMESTAMP_STRING
       USE TRANSFER_MOD, ONLY : TRANSFER_A6, TRANSFER_3D_Lp1
       USE TRANSFER_MOD, ONLY : TRANSFER_3D, TRANSFER_G5_PLE
+
+      USE ERROR_MOD,    ONLY : ERROR_STOP
+      USE m_netcdf_io_read
+      USE m_netcdf_io_checks
 !
 ! !INPUT PARAMETERS: 
 !
@@ -1197,6 +1253,9 @@
       REAL*8,  INTENT(OUT), OPTIONAL :: ZMEU(IIPAR,JJPAR,LLPAR)
       REAL*8,  INTENT(OUT), OPTIONAL :: ZMMD(IIPAR,JJPAR,LLPAR)
       REAL*8,  INTENT(OUT), OPTIONAL :: ZMMU(IIPAR,JJPAR,LLPAR)
+      REAL*8,  INTENT(OUT), OPTIONAL :: PUA(IIPAR,JJPAR,LLPAR)
+      REAL*8,  INTENT(OUT), OPTIONAL :: PVA(IIPAR,JJPAR,LLPAR)
+      REAL*8,  INTENT(OUT), OPTIONAL :: SDA(IIPAR,JJPAR,LLPAR)
       REAL*8,  INTENT(OUT), OPTIONAL :: T_FULLGRID(IIPAR,JJPAR,LGLOB)
 
 !
@@ -1276,14 +1335,18 @@
 !
       INTEGER                        :: I, IJLOOP, J, K, L
       INTEGER                        :: IOS, NFOUND, N_A6
-      REAL*4                         :: D(IIPAR,JJPAR,LGLOB)       
+      REAL*4                         :: D(IIPAR,JJPAR,LGLOB)  
+      REAL*4                         :: DM1(IIPAR,JJPAR,LGLOB-1)       
       REAL*4                         :: D1(IIPAR,JJPAR,LGLOB+1)       
       REAL*8                         :: C1, C2
       REAL*8                         :: TAUCLD(LLPAR,IIPAR,JJPAR)
       REAL*8                         :: CLDTOT(LLPAR,IIPAR,JJPAR)
       CHARACTER(LEN=8)               :: NAME
       CHARACTER(LEN=16)              :: STAMP
-      INTEGER                        :: XYMD, XHMS
+      INTEGER                        :: XYMD, XHMS, ST4D(4), CT4D(4)
+      INTEGER                        :: CT4DM1(4)
+      INTEGER                        :: HR, MN, TSTRT
+      REAL*4                         :: TIMES(4), DHMS
 
       !=================================================================
       ! READ_A6 begins here!      
@@ -1298,6 +1361,260 @@
 
       ! Zero number of fields that we have found
       NFOUND = 0
+
+#ifdef GISS
+
+      !=================================================================
+      ! Read the A-6 fields from NetCDF files
+      !=================================================================
+
+      ! Read in time stamps and find closest time
+      IF ( Ncdoes_Var_Exist( IU_A6, 'time' ) ) THEN
+         call NcRd( TIMES, IU_A6, 'time', (/1/), (/4/) )
+         TIMES = MOD( TIMES, 24d0 )
+         HR    = FLOOR( REAL(NHMS)/10000e0 )
+         MN    = FLOOR( (NHMS-HR*10000)/100e0 )
+         DHMS  = HR + MN/60e0
+         TSTRT = MINLOC( ABS( TIMES-DHMS ), 1 )
+         !WRITE(6,*) 'A6 TSTRT=', TSTRT
+      ELSE
+         CALL ERROR_STOP( "NO TIME STAMPS IN A6 FILE", 'read_a6' )
+      ENDIF
+
+      ST4D   = (/     1,     1,       1, TSTRT /)
+      CT4D   = (/ IIPAR, JJPAR,   LGLOB,     1 /)
+      CT4DM1 = (/ IIPAR, JJPAR, LGLOB-1,     1 /)
+
+      !--------------------------------------
+      ! CLDF: Cloud Fraction
+      !--------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A6, 'CLDF' ) ) THEN
+         call NcRd( D, IU_A6, 'CLDF', st4d, ct4d )
+         IF ( PRESENT( CLDF ) ) CALL TRANSFER_A6( D, CLDF )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------------
+      ! C_EU1: GISS Model E Entrainment below 800mb by UP1
+      !        [Pa s-1]
+      !--------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A6, 'C_EU1' ) ) THEN
+         call NcRd( D, IU_A6, 'C_EU1', st4d, ct4d )
+         IF ( PRESENT( C_EU1 ) ) CALL TRANSFER_3D( D, C_EU1 )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------------
+      ! C_ED1: GISS Model E Entrainment by DD1
+      !         [Pa s-1]
+      !--------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A6, 'C_ED1' ) ) THEN
+         call NcRd( D, IU_A6, 'C_ED1', st4d, ct4d )
+         IF ( PRESENT( C_ED1 ) ) CALL TRANSFER_3D( D, C_ED1 )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------------
+      ! C_ED2: GISS Model E Entrainment by DD2
+      !         [Pa s-1]
+      !--------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A6, 'C_ED2' ) ) THEN
+         call NcRd( D, IU_A6, 'C_ED2', st4d, ct4d )
+         IF ( PRESENT( C_ED2 ) ) CALL TRANSFER_3D( D, C_ED2 )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------------
+      ! C_OD1: GISS Model E Outflow from DD1
+      !         [Pa s-1]
+      !--------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A6, 'C_OD1' ) ) THEN
+         call NcRd( D, IU_A6, 'C_OD1', st4d, ct4d )
+         IF ( PRESENT( C_OD1 ) ) CALL TRANSFER_3D( D, C_OD1 )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------------
+      ! C_OD2: GISS Model E Outflow from DD2
+      !         [Pa s-1]
+      !--------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A6, 'C_OD2' ) ) THEN
+         call NcRd( D, IU_A6, 'C_OD2', st4d, ct4d )
+         IF ( PRESENT( C_OD2 ) ) CALL TRANSFER_3D( D, C_OD2 )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------------
+      ! DETRAINE: GCAP Detrainment (ent pl)
+      !--------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A6, 'C_OU2' ) ) THEN
+         call NcRd( D, IU_A6, 'C_OU2', st4d, ct4d )
+         IF ( PRESENT( DETRAINE ) ) CALL TRANSFER_3D( D, DETRAINE )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------------
+      ! DETRAINN: GCAP Detrainment (non-ent)
+      !--------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A6, 'C_OU1' ) ) THEN
+         call NcRd( D, IU_A6, 'C_OU1', st4d, ct4d )
+         IF ( PRESENT( DETRAINN ) ) CALL TRANSFER_3D( D, DETRAINN )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------------
+      ! DNDE: GCAP Downdraft (ent plume)
+      !--------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A6, 'C_DD2' ) ) THEN
+         call NcRd( D, IU_A6, 'C_DD2', st4d, ct4d )
+         IF ( PRESENT( DNDE ) ) CALL TRANSFER_3D( D, DNDE )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------------
+      ! DNDN: GCAP Downdraft (non-ent plume)
+      !--------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A6, 'C_DD1' ) ) THEN
+         call NcRd( D, IU_A6, 'C_DD1', st4d, ct4d )
+         IF ( PRESENT( DNDN ) ) CALL TRANSFER_3D( D, DNDN )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------------
+      ! ENTRAIN: GCAP Entrainment
+      !--------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A6, 'C_EU2' ) ) THEN
+         call NcRd( D, IU_A6, 'C_EU2', st4d, ct4d )
+         IF ( PRESENT( ENTRAIN ) ) CALL TRANSFER_3D( D, ENTRAIN )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------------
+      ! MOISTQ: H2O tendency
+      !--------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A6, 'MOISTQ' ) ) THEN
+         call NcRd( D, IU_A6, 'MOISTQ', st4d, ct4d )
+         IF ( PRESENT( MOISTQ ) ) CALL TRANSFER_A6( D, MOISTQ )
+         NFOUND = NFOUND + 1
+      ENDIF
+      
+      !--------------------------------------
+      ! OPTDEPTH: Grid box opt depth
+      !--------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A6, 'OPTDEPTH' ) ) THEN
+         call NcRd( D, IU_A6, 'OPTDEPTH', st4d, ct4d )
+         IF ( PRESENT( OPTDEPTH ) ) CALL TRANSFER_A6( D, OPTDEPTH )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !------------------------------------------
+      ! Q (Specific Humidity; g/kg)
+      !------------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A6, 'Q' ) ) THEN
+         call NcRd( D, IU_A6, 'Q', st4d, ct4d )
+         IF ( PRESENT( Q ) ) CALL TRANSFER_3D( D, Q )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !------------------------------------------
+      ! T (Temperature; K)
+      !------------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A6, 'T' ) ) THEN
+         call NcRd( D, IU_A6, 'T', st4d, ct4d )
+         IF ( PRESENT( T ) ) CALL TRANSFER_3D( D, T )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !------------------------------------------
+      ! U (Zonal Wind; m/s) on B-Grid
+      !------------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A6, 'UB' ) ) THEN
+         call NcRd( D, IU_A6, 'UB', st4d, ct4d )
+         IF ( PRESENT( U ) ) CALL TRANSFER_3D( D, U )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------------
+      ! UPDE: GCAP Downdraft (ent plume) up2
+      !--------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A6, 'C_UP2' ) ) THEN
+         call NcRd( D, IU_A6, 'C_UP2', st4d, ct4d )
+         IF ( PRESENT( UPDE ) ) CALL TRANSFER_3D( D, UPDE )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------------
+      ! UPDN: Downdraft (non-ent plume) up1
+      !--------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A6, 'C_UP1' ) ) THEN
+         call NcRd( D, IU_A6, 'C_UP1', st4d, ct4d )
+         IF ( PRESENT( UPDN ) ) CALL TRANSFER_3D( D, UPDN )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !------------------------------------------
+      ! V (Meridional Wind; m/s) on B-Grid
+      !------------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A6, 'VB' ) ) THEN
+         call NcRd( D, IU_A6, 'VB', st4d, ct4d )
+         IF ( PRESENT( V ) ) CALL TRANSFER_3D( D, V )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !------------------------------------------
+      ! PUA East-West Mass Flux (mb/s)
+      !------------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A6, 'PUA' ) ) THEN
+         call NcRd( D, IU_A6, 'PUA', st4d, ct4d )
+         IF ( PRESENT( PUA ) ) CALL TRANSFER_3D( D, PUA )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !------------------------------------------
+      ! PVA North-South Mass Flux (mb/s)
+      !------------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A6, 'PVA' ) ) THEN
+         call NcRd( D, IU_A6, 'PVA', st4d, ct4d )
+         IF ( PRESENT( PVA ) ) CALL TRANSFER_3D( D, PVA )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !------------------------------------------
+      ! SDA Up-Down Mass Flux (mb/s) (negative upward convention)
+      !------------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_A6, 'SDA' ) ) THEN
+         call NcRd( D, IU_A6, 'SDA', st4d, ct4d )
+         IF ( PRESENT( SDA ) ) CALL TRANSFER_3D( D, SDA )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !=================================================================
+      ! CLDTOPS(I,J) = level of convective cloud top at (I,J).
+      ! GEOS-CHEM cloud top at (I,J) is at top of first level where 
+      ! cloud mass flux goes from being nonzero to zero.  
+      !=================================================================
+
+      ! CLDTOPS is highest location of ZMMU in the column (I,J)
+      IF ( PRESENT( CLDTOPS ) .and. PRESENT( UPDN ) ) THEN
+         DO J = 1, JJPAR
+         DO I = 1, IIPAR
+            CLDTOPS(I,J) = 1
+            DO L = LLPAR, 1, -1
+               IF ( UPDN(I,J,L) > 0d0 ) THEN
+                  CLDTOPS(I,J) = L + 1
+                  EXIT
+               ENDIF
+            ENDDO         
+         ENDDO
+         ENDDO
+      ENDIF     
+
+      WRITE(6,*) 'A6 GISS FIELDS FOUND: ', NFOUND
+
+      ! Apply FFT to GISS winds, consistent with GISS model
+      CALL MAKE_GISS_WINDS( U, V )
+
+#else
 
       !=================================================================
       ! Read the A-6 fields from disk
@@ -1394,7 +1711,7 @@
             CASE ( 'DNDE', 'C_DD2' ) 
                READ( IU_A6, IOSTAT=IOS ) XYMD, XHMS, D
                IF ( IOS /= 0 ) CALL IOERROR( IOS, IU_A6, 'read_a6:7' )
- 
+               D = -1d0 * D
                IF ( CHECK_TIME( XYMD, XHMS, NYMD, NHMS ) ) THEN
                   IF ( PRESENT( DNDE ) ) CALL TRANSFER_3D( D, DNDE )
                   NFOUND = NFOUND + 1
@@ -1406,7 +1723,7 @@
             CASE ( 'DNDN', 'C_DD1' ) 
                READ( IU_A6, IOSTAT=IOS ) XYMD, XHMS, D
                IF ( IOS /= 0 ) CALL IOERROR( IOS, IU_A6, 'read_a6:8' )
- 
+               D = -1d0 * D 
                IF ( CHECK_TIME( XYMD, XHMS, NYMD, NHMS ) ) THEN
                   IF ( PRESENT( DNDN ) ) CALL TRANSFER_3D( D, DNDN )
                   NFOUND = NFOUND + 1
@@ -1930,7 +2247,7 @@
       ! For GEOS-5 : mass flux is "CMFMC"  field
       ! For GCAP   : mass flux is "UPDN"   field
       !=================================================================
-#if   defined( GISS ) || defined( GCAP )
+#if   defined( GCAP )
 
       !------------------------------
       ! Special handling for GCAP
@@ -2014,6 +2331,8 @@
          CLDF = CLDTOT
       ENDIF
 
+#endif ! GISS vs. GEOS
+
       !=================================================================
       ! MOISTQ < 0 denotes precipitation.  Convert negative values to
       ! positives, and then divide by 8.64d7 to convert to units of
@@ -2030,6 +2349,7 @@
 
          ! Then convert to [kg H2O/kg air/s]
          MOISTQ = -MOISTQ / 8.64d7
+
       ENDIF
 
       !=================================================================

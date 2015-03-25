@@ -216,6 +216,10 @@
       USE FILE_MOD,           ONLY : IOERROR, FILE_EXISTS
       USE GIGC_Input_Opt_Mod, ONLY : OptInput
       USE TIME_MOD,           ONLY : EXPAND_DATE
+      USE TIME_MOD,           ONLY : GET_NYMD
+
+      USE m_netcdf_io_open
+      USE m_netcdf_io_close
 !
 ! !INPUT PARAMETERS:
 !
@@ -259,6 +263,22 @@
 
       ! Open the A-3 file 0 GMT of each day, or on the first call
       IF ( NHMS == 000000 .or. FIRST ) THEN
+
+#ifdef GISS 
+
+         ! Strings for directory & filename
+         PATH  = TRIM( Input_Opt%DATA_DIR ) // 'BGRID/TOPO'
+
+         IF ( IU_PH > 0 ) CALL NcCl( IU_PH )
+
+         ! Open the constant file
+         call NcOp_Rd( IU_PH, TRIM( PATH ) )
+
+         ! Echo info
+         WRITE( 6, 100 ) TRIM( PATH ), IU_PH
+ 100     FORMAT( '     - Opening: ', a,  ' on unit ', i6 )
+         
+#else ! Old GCAP treatment
 
          ! Strings for directory & filename
          GEOS_DIR  = TRIM( Input_Opt%GISS_DIR )
@@ -313,6 +333,9 @@
          IF ( IOS /= 0 ) THEN
             CALL IOERROR( IOS, IU_PH, 'open_phis_fields:2' )
          ENDIF
+
+#endif
+
       ENDIF
 
       END SUBROUTINE OPEN_GCAP_FIELDS
@@ -334,6 +357,7 @@
 !
 ! !USES:
 !
+      USE DIAG_MOD,           ONLY : AD67
       USE GIGC_Input_Opt_Mod, ONLY : OptInput
       USE GIGC_State_Met_Mod, ONLY : MetState
 !
@@ -367,11 +391,27 @@
       NYMD = 20000101
       NHMS = 000000
 
+#ifdef GISS 
+
+      CALL READ_GCAP( NYMD     = NYMD,
+     &                NHMS     = NHMS,
+     &                PHIS     = State_Met%PHIS,
+     &                FROCEAN  = State_Met%FROCEAN,
+     &                FRLAKE   = State_Met%FRLAKE,
+     &                FRLAND   = State_Met%FRLAND,
+     &                FRLANDIC = State_Met%FRLANDIC,
+     &                HLAKE    = State_Met%HLAKE     )
+
+#else
+
       ! For GCAP met fields: read PHIS and LWI_GISS
+      ! ltm: Eventually remove all old GCAP code
       CALL READ_GCAP( NYMD = NYMD, 
      &                NHMS = NHMS, 
      &                PHIS = State_Met%PHIS, 
      &                LWI  = State_Met%LWI_GISS )
+
+#endif
 
       ! Return to calling program
       END SUBROUTINE GET_GCAP_FIELDS
@@ -440,7 +480,8 @@
 !\\
 ! !INTERFACE:
 !
-      SUBROUTINE READ_GCAP( NYMD, NHMS, PHIS, LWI )
+      SUBROUTINE READ_GCAP( NYMD, NHMS, PHIS,  
+     &                      FROCEAN, FRLAKE, FRLAND, FRLANDIC, HLAKE )
 !
 ! !USES:
 !
@@ -452,6 +493,9 @@
       USE CMN_SIZE_MOD                                     ! Size parameters
       USE CMN_DIAG_MOD                                     ! ND67
       USE CMN_GCTM_MOD                                     ! g0
+
+      USE m_netcdf_io_read
+      USE m_netcdf_io_checks
 !
 ! !INPUT PARAMETERS: 
 !
@@ -460,8 +504,12 @@
 !
 ! !OUTPUT PARAMETERS:
 !
-      REAL*8,  INTENT(OUT)           :: PHIS(IIPAR,JJPAR)  ! PHIS [m2/s2]
-      REAL*8,  INTENT(OUT), OPTIONAL :: LWI(IIPAR,JJPAR)   ! LWI flags
+      REAL*8,  INTENT(OUT)           :: PHIS(IIPAR,JJPAR)     ! GeopotHgt[m2/s2]
+      REAL*8,  INTENT(OUT), OPTIONAL :: FROCEAN(IIPAR,JJPAR)  ! Fraction ocean
+      REAL*8,  INTENT(OUT), OPTIONAL :: FRLAKE(IIPAR,JJPAR)   ! Fraction lakes
+      REAL*8,  INTENT(OUT), OPTIONAL :: FRLAND(IIPAR,JJPAR)   ! Fraction land
+      REAL*8,  INTENT(OUT), OPTIONAL :: FRLANDIC(IIPAR,JJPAR) ! Fraction land ice
+      REAL*8,  INTENT(OUT), OPTIONAL :: HLAKE(IIPAR,JJPAR)    !
 ! 
 ! !REVISION HISTORY: 
 !  01 Feb 2006 - S. Wu       - Initial version
@@ -478,14 +526,14 @@
 !
 ! !LOCAL VARIABLES:
 !
-      INTEGER            :: NFOUND, IOS
+      INTEGER            :: NFOUND, IOS, ST2D(2), CT2D(2)
       INTEGER            :: XYMD,   XHMS 
       REAL*4             :: Q2(IIPAR,JJPAR)
       CHARACTER(LEN=8)   :: NAME
       CHARACTER(LEN=16)  :: STAMP
 
       ! Number of fields in the file
-      INTEGER, PARAMETER :: N_PHIS = 2
+      INTEGER, PARAMETER :: N_PHIS = 6
 
       !=================================================================
       ! READ_PHIS begins here!
@@ -493,6 +541,78 @@
 
       ! Zero number of PHIS fields we have found
       NFOUND = 0
+
+#ifdef GISS 
+
+      !=================================================================
+      ! Read the constant fields from NetCDF files
+      !=================================================================
+
+      ST2D = (/     1,     1 /)
+      CT2D = (/ IIPAR, JJPAR /)
+
+      !--------------------------------------
+      ! PHIS: Geopotential Height [m] ([m2/s2]/g0)
+      !--------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_PH, 'zatmo' ) ) THEN
+         call NcRd( Q2, IU_PH, 'zatmo', st2d, ct2d )
+         CALL TRANSFER_2D( Q2, PHIS )
+         NFOUND = NFOUND + 1
+       ENDIF
+
+      !--------------------------------------
+      ! FROCEAN: Fraction Ocean [fraction]
+      !--------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_PH, 'focean' ) ) THEN
+         call NcRd( Q2, IU_PH, 'focean', st2d, ct2d )
+         IF ( PRESENT( FROCEAN ) ) CALL TRANSFER_2D( Q2, FROCEAN )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------------
+      ! FRLAKE: Fraction Lakes [fraction]
+      !--------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_PH, 'flake' ) ) THEN
+         call NcRd( Q2, IU_PH, 'flake', st2d, ct2d )
+         IF ( PRESENT( FRLAKE ) ) CALL TRANSFER_2D( Q2, FRLAKE )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------------
+      ! FRLAND: Fraction Land [fraction]
+      !--------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_PH, 'fgrnd' ) ) THEN
+         call NcRd( Q2, IU_PH, 'fgrnd', st2d, ct2d )
+         IF ( PRESENT( FRLAND ) ) CALL TRANSFER_2D( Q2, FRLAND )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------------
+      ! FRLANDIC: Fraction Land Ice [fraction]
+      !--------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_PH, 'fgice' ) ) THEN
+         call NcRd( Q2, IU_PH, 'fgice', st2d, ct2d )
+         IF ( PRESENT( FRLANDIC ) ) CALL TRANSFER_2D( Q2, FRLANDIC )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !--------------------------------------
+      ! HLAKE:
+      !--------------------------------------
+      IF ( Ncdoes_Var_Exist ( IU_PH, 'hlake' ) ) THEN
+         call NcRd( Q2, IU_PH, 'hlake', st2d, ct2d )
+         IF ( PRESENT( HLAKE ) ) CALL TRANSFER_2D( Q2, HLAKE )
+         NFOUND = NFOUND + 1
+      ENDIF
+
+      !=================================================================
+      ! ND67 diagnostic: 
+      !=================================================================
+      IF ( ND67 > 0 ) THEN
+         AD67(:,:,15) = AD67(:,:,15) + PHIS  ! Sfc geopotential [m]
+      ENDIF
+
+#else ! Old GCAP treatment
 
       !=================================================================
       ! Read PHIS field from disk
@@ -574,6 +694,10 @@
       ! Since we only read PHIS at the start of the run,
       ! close the file unit (bmy, 6/16/03)
       CLOSE( IU_PH )
+
+#endif
+
+
 
       END SUBROUTINE READ_GCAP
 !EOC

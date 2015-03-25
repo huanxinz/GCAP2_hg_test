@@ -1,39 +1,32 @@
       MODULE FFT72
-!     @sum  FFT72 calculates the Fast Fourier Transform
-!     @auth Gary Russell
-!     @ver  1.0 (for KM=72)
-!     USE CONSTANT, only : twopi,rt2,rt3
+!@sum  FFT72 calculates the Fast Fourier Transform
+!@auth Gary Russell
+!@ver  1.0 (for KM=72)
+      USE CONSTANT, only : twopi,rt2,rt3
       IMPLICIT NONE
       SAVE
-
-!     From CONST.f
-      REAL*8, PARAMETER :: TWOPI = 2d0*3.1415926535897932d0
-      REAL*8, PARAMETER :: RT2 = 1.4142135623730950d0
-      REAL*8, PARAMETER :: RT3 = 1.7320508075688772d0
-      
-!     @param KM length of input array; to change KM => rewrite module !!!
-!     
-!     
+!@param KM length of input array; to change KM => rewrite module !!!
       INTEGER, PARAMETER :: KM=72
-      
-      REAL*8, PARAMETER :: BYKM=1d0/KM !@param BYKM  1/KM
-      REAL*8, PARAMETER :: BYKMH=2d0/KM !@param BYKMH 1/(KM/2)
-      REAL*8, PARAMETER :: BYKM2=1d0/(2*KM) !@param BYKM2 1/(2*KM)
-!     @var C,S cos/sin evaluated on grid points
+
+      REAL*8, PARAMETER :: BYKM=1d0/KM   !@param BYKM  1/KM
+      REAL*8, PARAMETER :: BYKMH=2d0/KM  !@param BYKMH 1/(KM/2)
+      REAL*8, PARAMETER :: BYKM2=1d0/(2*KM)!@param BYKM2 1/(2*KM)
+!@var C,S cos/sin evaluated on grid points
       REAL*8 :: C(0:KM),S(0:KM)
-!     @var CH,SH cos/sin evaluated on half points
+!@var CH,SH cos/sin evaluated on half points
       REAL*8 :: CH(KM/2-1),SH(KM/2-1)
-      
-!     @var C240,C241,S241,C8,S8  intermediate sums for FFT
-!     @var C41,C42,C43,C44,S41,S42,S43,S44 intermediate sums for FFT
-!     @var C21,C22,S21,S22  intermediate sums for FFT
+
+!@var C240,C241,S241,C8,S8  intermediate sums for FFT
+!@var C41,C42,C43,C44,S41,S42,S43,S44 intermediate sums for FFT
+!@var C21,C22,S21,S22  intermediate sums for FFT
       REAL*8 :: C240(24), C241(24), S241(24)
       REAL*8 :: C8(8,0:4),S8(8,4)
       REAL*8 :: C41(0:9),C42(0:9),C43(0:9),C44(0:9),
-     &     S41(  9),S42(  9),S43(  9),S44(  9)
+     *          S41(  9),S42(  9),S43(  9),S44(  9)
       REAL*8 :: C21(0:18),C22(0:18),S21(0:18),S22(0:18)
-!$OMP THREADPRIVATE( C240,C241,S241,C8,S8,C41,C42,C43,C44 )
-!$OMP THREADPRIVATE( S41,S42,S43,S44,C21,C22,S21,S22 )
+      COMMON /FFTCOM/ C240,C241,S241,C8,S8,C41,C42,C43,C44,
+     *                S41,S42,S43,S44,C21,C22,S21,S22
+!$OMP  THREADPRIVATE(/FFTCOM/)
 
       END MODULE FFT72
 C****
@@ -42,7 +35,6 @@ C****
 !@auth Gary Russell
 !@ver  1.0
       USE FFT72
-      USE ERROR_MOD
       IMPLICIT NONE
       INTEGER N !@var N loop variables
       INTEGER, INTENT(IN) :: IM    !@var IM size of arrays (must=KM)
@@ -64,7 +56,7 @@ C
       END DO
       RETURN
   100 WRITE (6,*) ' This version of FFT is for ',KM,'. IM =',IM
-      CALL GEOS_CHEM_STOP
+      call stop_model('stopped in FFT72.f',255)
       END SUBROUTINE FFT0
 C****
       SUBROUTINE FFT (F,A,B)
@@ -461,3 +453,4 @@ C**** Calculate expressions summed by increments of 2
 C****
       RETURN
       END SUBROUTINE DOCALC
+

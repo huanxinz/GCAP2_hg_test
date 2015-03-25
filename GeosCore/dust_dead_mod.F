@@ -4744,8 +4744,12 @@ c Fix up for negative argument, erf, etc.
 
       USE CMN_SIZE_MOD     ! Size parameters
 
+      USE m_netcdf_io_open
+      USE m_netcdf_io_read
+      USE m_netcdf_io_close
+
       ! Local variables
-      INTEGER               :: I, IOS
+      INTEGER               :: I, IOS, IU_DST, STRT(3), CNT(3)
       REAL*4                :: ARRAY(IIPAR,JJPAR,1)
       REAL*8                :: XTAU
       CHARACTER(LEN=255)    :: FILENAME
@@ -4802,10 +4806,86 @@ c Fix up for negative argument, erf, etc.
       ! SFC_TYP        ; surface type:                 IIPAR JJPAR
       !=================================================================
 
+#if defined( GISS )
+
+      ! Filename
+      FILENAME = TRIM( DATA_DIR )         //
+     &           'dust_200605/dst_tibds.' // GET_NAME_EXT_2D() //
+     &           '.'                      // GET_RES_EXT()     // '.nc'
+
+      WRITE( 6, 100 ) TRIM( FILENAME )
+ 100  FORMAT( '     - GET_TIME_INVARIANT_DATA: Reading ', a )
+
+      ! Read Data
+      CALL NcOp_Rd( IU_DST, TRIM(FILENAME ) )
+
+      STRT = (/     1,     1, 1 /)
+      CNT  = (/ IIPAR, JJPAR, 1 /)
+
+      CALL NcRd( ARRAY, IU_DST, 'EF_GEO',   STRT, CNT )
+      CALL TRANSFER_2D( ARRAY(:,:,1), ERD_FCT_GEO )
+
+      CALL NcRd( ARRAY, IU_DST, 'EF_HYDRO', STRT, CNT )
+      CALL TRANSFER_2D( ARRAY(:,:,1), ERD_FCT_HYDRO )
+
+      CALL NcRd( ARRAY, IU_DST, 'EF_TOPO',  STRT, CNT )
+      CALL TRANSFER_2D( ARRAY(:,:,1), ERD_FCT_TOPO )
+
+      CALL NcRd( ARRAY, IU_DST, 'EF_UNITY', STRT, CNT )
+      CALL TRANSFER_2D( ARRAY(:,:,1), ERD_FCT_UNITY )
+
+      !CALL NcRd( ARRAY, IU_DST, 'MBLBSN_F', STRT, CNT )
+      !CALL TRANSFER_2D( ARRAY(:,:,1), MBL_BSN_FCT )
+      ! ??? Is this correct (bmy, 4/9/04)
+      !
+      ! Set erodibility to a global uniform value of 5.707
+      ! as recommended by Zender et al 2003 (tdf, 4/9/04)
+      MBL_BSN_FCT(:,:) = 1.0d0
+
+      CALL NcRd( ARRAY, IU_DST, 'LF_DRY',   STRT, CNT )
+      CALL TRANSFER_2D( ARRAY(:,:,1), LND_FRC_DRY )
+
+      CALL NcRd( ARRAY, IU_DST, 'MF_CaCO3', STRT, CNT )
+      CALL TRANSFER_2D( ARRAY(:,:,1), MSS_FRC_CaCO3 )
+
+      CALL NcRd( ARRAY, IU_DST, 'MF_CLY',   STRT, CNT )
+      CALL TRANSFER_2D( ARRAY(:,:,1), MSS_FRC_CLY )
+
+      CALL NcRd( ARRAY, IU_DST, 'MF_SND',   STRT, CNT ) 
+      CALL TRANSFER_2D( ARRAY(:,:,1), MSS_FRC_SND )
+
+      CALL NcRd( ARRAY, IU_DST, 'SRF_TYP',  STRT, CNT )
+      SFC_TYP = NINT( ARRAY(:,:,1) )
+
+      CALL NcCl( IU_DST )
+
+      !------------------------
+      ! GOCART source function
+      ! (tdf, bmy, 1/25/07)
+      !------------------------
+
+      ! Filename
+      FILENAME = TRIM( DATA_DIR )         //
+     &           'dust_200605/GOCART_src_fn.' // GET_NAME_EXT_2D() //
+     &           '.'                      // GET_RES_EXT()     // '.nc'
+
+      WRITE( 6, 100 ) TRIM( FILENAME )
+
+      ! Read data
+      CALL NcOp_Rd( IU_DST, TRIM(FILENAME ) )
+
+      CALL NcRd( ARRAY, IU_DST, 'GOC_SRC', STRT,  CNT )
+      CALL TRANSFER_2D( ARRAY(:,:,1), SRCE_FUNC )
+
+      CALL NcCl( IU_DST )
+
+#else
+
       ! Filename
       FILENAME = TRIM( DATA_DIR )         //
      &           'dust_200605/dst_tibds.' // GET_NAME_EXT_2D() //
      &           '.'                      // GET_RES_EXT()
+
 
       ! TAU value for reading the bpch files
       XTAU     = GET_TAU0( 1, 1, 1985 )
@@ -4938,6 +5018,8 @@ c Fix up for negative argument, erf, etc.
       ! Cast to REAL*8
       CALL TRANSFER_2D( ARRAY(:,:,1), SRCE_FUNC )
 
+#endif
+
       ! Return to calling program
       END SUBROUTINE GET_TIME_INVARIANT_DATA
 
@@ -4966,8 +5048,12 @@ c Fix up for negative argument, erf, etc.
 
       USE CMN_SIZE_MOD        ! Size parameters
 
+      USE m_netcdf_io_open
+      USE m_netcdf_io_read
+      USE m_netcdf_io_close
+
       ! Local variables
-      INTEGER               :: THISMONTH
+      INTEGER               :: THISMONTH, IU_DST, STRT(3), CNT(3)
       REAL*4                :: ARRAY(IIPAR,JJPAR,1)
       REAL*8                :: XTAU
       CHARACTER(LEN=255)    :: FILENAME
@@ -4975,6 +5061,29 @@ c Fix up for negative argument, erf, etc.
       !=================================================================
       ! GET_MONTHLY_DATA begins here!
       !=================================================================
+
+#if defined( GISS )
+
+      ! Filename
+      FILENAME = TRIM( DATA_DIR )         //
+     &           'dust_200605/dst_tvbds.' // GET_NAME_EXT_2D() //
+     &           '.'                      // GET_RES_EXT()     // '.nc'
+
+      WRITE( 6, 100 ) TRIM( FILENAME )
+ 100  FORMAT( '     - GET_MONTHLY_DATA: Reading ', a )
+
+      ! Read data
+      CALL NcOp_Rd( IU_DST, TRIM(FILENAME ) )
+
+      STRT = (/ 1, 1, GET_MONTH() /)
+      CNT  = (/ IIPAR, JJPAR, 1 /)
+
+      CALL NcRd( ARRAY, IU_DST, 'VAI', STRT, CNT )
+      CALL TRANSFER_2D( ARRAY(:,:,1), VAI_DST )
+
+      CALL NcCl( IU_DST )
+
+#else
 
       ! Filename and time
       FILENAME  = TRIM( DATA_DIR )         //
@@ -4998,6 +5107,8 @@ c Fix up for negative argument, erf, etc.
 
       ! Cast to REAL*8 and resize
       CALL TRANSFER_2D( ARRAY(:,:,1), VAI_DST )
+
+#endif
 
       ! Return to calling program
       END SUBROUTINE GET_MONTHLY_DATA

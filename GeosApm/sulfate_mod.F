@@ -6263,7 +6263,7 @@
       IF ( ITS_A_NEW_MONTH() ) THEN 
 
          ! Read monthly mean data
-         CALL READ_SST( MONTH, YEAR, State_Met )
+         CALL READ_SST( MONTH, YEAR, State_Met, Input_Opt )
          CALL READ_OCEAN_DMS( MONTH )
          CALL READ_NATURAL_NH3( MONTH )
 

@@ -59,6 +59,7 @@ MODULE GIGC_Input_Opt_Mod
      CHARACTER(LEN=255)          :: MERRA_DIR          
      CHARACTER(LEN=255)          :: DATA_DIR_1x1       
      CHARACTER(LEN=255)          :: TEMP_DIR           
+     CHARACTER(LEN=255)          :: RUNID
      LOGICAL                     :: LUNZIP             
      LOGICAL                     :: LWAIT              
      LOGICAL                     :: LVARTROP           
@@ -748,6 +749,7 @@ CONTAINS
     Input_Opt%MERRA_DIR              = ''
     Input_Opt%DATA_DIR_1x1           = ''
     Input_Opt%TEMP_DIR               = ''
+    Input_Opt%RUNID                  = ''
     Input_Opt%LUNZIP                 = .FALSE.
     Input_Opt%LWAIT                  = .FALSE.
     Input_Opt%LVARTROP               = .FALSE.

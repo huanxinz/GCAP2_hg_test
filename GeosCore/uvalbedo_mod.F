@@ -51,7 +51,7 @@
 
 !------------------------------------------------------------------------------
 
-      SUBROUTINE READ_UVALBEDO( MONTH, State_Met )
+      SUBROUTINE READ_UVALBEDO( MONTH, State_Met, Input_Opt )
 !
 !******************************************************************************
 !  Subroutine READ_UVALBEDO reads in UV albedo data from a binary punch
@@ -100,18 +100,24 @@
       USE DIRECTORY_MOD,      ONLY : DATA_DIR
       USE ERROR_MOD,          ONLY : ALLOC_ERR
       USE GIGC_State_Met_Mod, ONLY : MetState
+      USE GIGC_Input_Opt_Mod, ONLY : OptInput
       USE TRANSFER_MOD,       ONLY : TRANSFER_2D
 
       USE CMN_SIZE_MOD             ! Size parameters
 
+      USE m_netcdf_io_open
+      USE m_netcdf_io_close
+      USE m_netcdf_io_read
+
       ! Arguments
       INTEGER,        INTENT(IN)    :: MONTH
       TYPE(MetState), INTENT(INOUT) :: State_Met   ! Meteorology State object
+      TYPE(OptInput), INTENT(IN)    :: Input_Opt
       
       ! Local Variables
       LOGICAL              :: FIRST = .TRUE.
-      INTEGER              :: AS
-      REAL*4               :: ARRAY(IIPAR,JJPAR,1)
+      INTEGER              :: AS, fID
+      REAL*4               :: ARRAY(IIPAR,JJPAR,1), ARRAY2(IIPAR,JJPAR)
       REAL*8               :: XTAU
       CHARACTER(LEN=255)   :: FILENAME
 
@@ -137,6 +143,18 @@
       ! Read UVALBEDO data from disk
       !=================================================================
 
+#if defined( GISS )
+
+      ! Assume that UV albedo is similar to VIS albedo
+      CALL NcOp_Rd( fID, TRIM( DATA_DIR ) // 'BGRID/' //
+     &     TRIM( Input_Opt%RUNID ) // '.acc.ymonmean.nc' )
+      CALL NcRd( ARRAY2, fID, 'grnd_alb', 
+     &                        (/1,1,MONTH/), (/IIPAR,JJPAR,1/) )
+      CALL NcCl( fID )
+      CALL TRANSFER_2D( ARRAY2, UVALBEDO )
+
+#else
+
       ! Create filename
       FILENAME = TRIM( DATA_DIR )            // 
      &           'uvalbedo_200111/uvalbedo.' // GET_NAME_EXT_2D() //
@@ -156,6 +174,8 @@
 
       ! Transfer data from REAL*4 to REAL*8 and to size (IIPAR,JJPAR)
       CALL TRANSFER_2D( ARRAY(:,:,1), UVALBEDO )
+
+#endif
       
       ! Copy met field to State_Met
       State_Met%UVALBEDO = UVALBEDO

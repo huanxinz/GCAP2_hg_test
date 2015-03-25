@@ -232,7 +232,7 @@ CONTAINS
 
     ! Scalars
     INTEGER :: I,     J,    IMUL,    ITD,  IJLOOP
-    INTEGER :: C,     II,   JJ,      type, K
+    INTEGER :: C,     II,   JJ,      typ,  K
     REAL*8  :: mapWt, area, sumArea, DMON, DITD, DIMUL
 
     ! Arrays
@@ -280,7 +280,16 @@ CONTAINS
     ENDDO
     ENDDO 
     !$OMP END PARALLEL DO
-
+    
+    !WRITE(6,*) "main Mapping!"
+    !WRITE(6,*) 'count: ', mapping(1,90)%count
+    !WRITE(6,*) 'ii: ',mapping(1,90)%ii
+    !WRITE(6,*) 'jj: ',mapping(1,90)%jj
+    !WRITE(6,*) 'olson: ',mapping(1,90)%olson
+    !WRITE(6,*) 'ordOlson: ',mapping(1,90)%ordOlson
+    !WRITE(6,*) 'area:', mapping(1,90)%area
+    !WRITE(6,*) 'sumarea', mapping(1,90)%sumarea
+      
     !======================================================================
     ! Bin data from the "fine" MODIS grid to the "coarse" GEOS-Chem grid.
     ! Populate arrays for backwards-compatibility w/ existing routines
@@ -290,7 +299,7 @@ CONTAINS
     !$OMP DEFAULT( SHARED                                           ) &
     !$OMP PRIVATE( I,         J,       tempArea, tempLai, tempLaiCm ) &
     !$OMP PRIVATE( tempLaiNm, sumArea, IJLOOP,   C,       II        ) & 
-    !$OMP PRIVATE( JJ,        type,    area,     K                  )      
+    !$OMP PRIVATE( JJ,        typ,     area,     K                  )      
     DO J = 1, JJPAR
     DO I = 1, IIPAR
 
@@ -320,17 +329,20 @@ CONTAINS
           ! Extract fields from MAP object
           II                = mapping(I,J)%II(C)
           JJ                = mapping(I,J)%JJ(C)
-          type              = mapping(I,J)%olson(C)
+          typ               = mapping(I,J)%olson(C)
           area              = mapping(I,J)%area(C)
 
           ! Sum of areas corresponding to each Olson
           ! for "coarse" GEOS-Chem grid box (I,J)
-          tempArea(type)    = tempArea(type)  + area 
+          tempArea(typ)    = tempArea(typ)  + area 
 
           ! Compute the total leaf area in "coarse" GEOS-Chem 
           ! grid box (I,J) corresponding to each Olson land type
-          tempLaiCm(type)   = tempLaiCm(type) + ( MODIS_LAI_CM(II,JJ) * area )
-          tempLaiNm(type)   = tempLaiNm(type) + ( MODIS_LAI_NM(II,JJ) * area )
+          !print*,II
+          !print*,JJ
+          !print*,area
+          tempLaiCm(typ)   = tempLaiCm(typ) + ( MODIS_LAI_CM(II,JJ) * area )
+          tempLaiNm(typ)   = tempLaiNm(typ) + ( MODIS_LAI_NM(II,JJ) * area )
 
           ! Compute the total leaf area in "coarse" GEOS-Chem
           ! grid box (I,J), irrespective of Olson land type

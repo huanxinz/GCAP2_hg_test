@@ -112,6 +112,10 @@ CONTAINS
 ! !USES:
 !
     USE GIGC_ErrCode_Mod
+#ifdef MODELE
+    USE GEOM,       ONLY : GEOM_B, LAT_DG, LON_DG
+    USE RESOLUTION, ONLY : JM
+#endif
 !
 ! !INPUT PARAMETERS:
 !
@@ -206,7 +210,7 @@ CONTAINS
 
 #if defined( MODELE )
              ! Longitude centers (do not straddle Int'l Date Line)
-             XMID(I,J,L)  = ( DLON(I,J,L) * IND_X(I) ) - 180d0 + ( DLON(I,J,L) * 0.5d0 )          
+             XMID(I,J,L)  = LON_DG(I,1) ! From GEOM_B.f
 #else
              ! Longitude centers
              XMID(I,J,L)  = ( DLON(I,J,L) * IND_X(I) ) - 180d0
@@ -251,10 +255,10 @@ CONTAINS
              !-------------------------------------------------------------
 #else
 
-# if defined( GCAP )
+#if defined( GCAP )
 
              !-------------------------------------------------------------
-             !             %%%%% TRADITIONAL GEOS-Chem %%%%%
+             !             %%%%%%%%%%%%% GCAP %%%%%%%%%%%%%%
              !
              ! For the GCAP model, there are no half-size polar boxes.
              ! Compute the latitude centers accordingly.  (bmy, 7/2/13)
@@ -263,7 +267,22 @@ CONTAINS
              ! Lat centers (degrees)
              YMID(I,J,L)     = ( DLAT(I,J,L) * IND_Y(J) ) - 88d0
 
-# else
+#elif defined( MODELE )
+
+             !-------------------------------------------------------------
+             !             %%%%% GISS-Driven GEOS-Chem %%%%%
+             !-------------------------------------------------------------
+
+             ! Lat centers (degrees)
+             YMID(I,J,L) = LAT_DG(J,1) ! From GEOM_B.f
+
+#ifdef GRIDF40
+             ! GISS convention at poles is different than GEOS-Chem/TPCORE
+             IF ( J .eq. 1  ) YMID(I,J,L) = -89d0
+             IF ( J .eq. JM ) YMID(I,J,L) =  89d0
+#endif
+
+#else
 
              !-------------------------------------------------------------
              !             %%%%% TRADITIONAL GEOS-Chem %%%%%
@@ -284,7 +303,8 @@ CONTAINS
                 YMID(I,J,L)  = +90d0 - ( 0.5d0 * DLAT(I,J,L) )   ! N pole
              ENDIF
 
-# endif
+#endif
+
 #endif
              ! Lat centers (radians)
              YMID_R(I,J,L)   = ( PI_180 * YMID(I,J,L)  )
@@ -322,6 +342,16 @@ CONTAINS
              !
              ! Do not define half-sized polar boxes (bmy, 3/21/13)
              !-----------------------------------------------------------
+
+#elif defined( MODELE )
+
+             !-------------------------------------------------------------
+             !             %%%%% GISS-Driven GEOS-Chem %%%%%
+             !-------------------------------------------------------------
+
+             ! Lat edges (degrees)
+             YEDGE(I,J,L) = LAT_DG(J,2) ! From GEOM_B.f
+
 #else
              !-----------------------------------------------------------
              !            %%%%% TRADITIONAL GEOS-Chem %%%%%

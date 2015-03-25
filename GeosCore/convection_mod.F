@@ -1152,8 +1152,9 @@
       CONVDT = GET_TS_CONV() * 60d0 
        
       ! NSTEP is the # of internal convection timesteps.  According to
-      ! notes in the old convection code, 300s works well. (swu, 12/12/03)
-      NSTEP  = CONVDT / 300    
+      ! notes in the old convection code
+      ! Note: This needed to be reduced from 300 from M23 to F40.
+      NSTEP  = CONVDT / 150d0    
       NSTEP  = MAX( NSTEP, 1 ) 
 
       ! TIMESTEP*2; will be divided by 2 before passing to CONVTRAN 

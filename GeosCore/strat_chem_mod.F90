@@ -952,6 +952,8 @@ CONTAINS
 
     ENDDO
 
+#if !defined( GISS )
+
     !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     ! Br_y species are handled differently
     !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -998,6 +1000,8 @@ CONTAINS
     ! Scale paleo concentrations
     Bry_night = Bry_night * Bryscale
     Bry_day   = Bry_day   * Bryscale
+#endif
+
 #endif
 
 #endif
@@ -1169,6 +1173,8 @@ CONTAINS
     ! Resize column to 1:LLPAR
     CALL TRANSFER_3D( array, STRAT_OH )
 
+#if !defined( GISS )
+
     !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     ! Get Bry concentrations [ppt]
     !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1218,6 +1224,8 @@ CONTAINS
        Bry_night( I, J, :, : ) = BryNight2x25( I_f2c(I), J_f2c(J), :, : )
     ENDDO
     ENDDO
+
+#endif
 
     DO N=1,NSCHEM
        NN = Strat_TrID_GMI(N)
@@ -1654,6 +1662,7 @@ CONTAINS
 
           DO N = 1, N_TRACERS
 
+#if !defined( GISS )
              ! For now, guarantee that GMI prod/loss rates are not used for any
              ! bromine species
              IF ( TRIM(TRACER_NAME(N)) .eq.      'Br' .or. &
@@ -1666,6 +1675,7 @@ CONTAINS
                   TRIM(TRACER_NAME(N)) .eq.   'CH3Br' .or. &
                   TRIM(TRACER_NAME(N)) .eq.     'HBr' .or. &
                   TRIM(TRACER_NAME(N)) .eq.    'HOBr'        ) CYCLE
+#endif
 
              ! SDE 08/28/13: Full strat. has its own mesospheric NOy handling
              IF ( LUCX ) THEN
@@ -1787,6 +1797,7 @@ CONTAINS
     IF ( AS /= 0 ) CALL ALLOC_ERR( 'SCHEM_TEND' )
     SCHEM_TEND = 0e0
 
+#if !defined( GISS )
     ! Allocate and initialize bromine arrays
     GC_Bry_TrID(1:6) = (/IDTBr2,IDTBr,IDTBrO,IDTHOBr,IDTHBr,IDTBrNO3/)
     ALLOCATE( Bry_temp( IIPAR, JJPAR, LGLOB ) )
@@ -1798,6 +1809,7 @@ CONTAINS
     ALLOCATE( Bry_night( IIPAR, JJPAR, LLPAR, 6 ) )
     IF ( AS /= 0 ) CALL ALLOC_ERR( 'Bry_night' )
     Bry_night = 0.
+#endif
 
     ! Free pointer
     NULLIFY( STT )

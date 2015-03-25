@@ -6021,7 +6021,7 @@
       IF ( ITS_A_NEW_MONTH() ) THEN 
 
          ! Read monthly mean data
-         CALL READ_SST( MONTH, YEAR, State_Met )
+         CALL READ_SST( MONTH, YEAR, State_Met, Input_Opt )
          CALL READ_OCEAN_DMS( MONTH )
          CALL READ_NATURAL_NH3( MONTH )
 
@@ -10242,6 +10242,11 @@
       USE BPCH2_MOD,     ONLY : GET_TAU0,        READ_BPCH2
       USE DIRECTORY_MOD, ONLY : DATA_DIR
       USE TRANSFER_MOD,  ONLY : TRANSFER_2D
+
+      USE m_netcdf_io_open
+      USE m_netcdf_io_read
+      USE m_netcdf_io_close
+
 !
 ! !INPUT PARAMETERS: 
 !
@@ -10264,10 +10269,30 @@
       REAL*4              :: ARRAY(IIPAR,JJPAR,1)
       REAL*8              :: XTAU
       CHARACTER(LEN=255)  :: FILENAME
+      INTEGER             :: STRT(3), CNT(3), IU
 
       !==================================================================
       ! READ_OCEAN_DMS begins here!
       !==================================================================
+
+#if defined( GISS )
+
+      ! File name
+      FILENAME = TRIM( DATA_DIR )                         // 
+     &           'sulfate_sim_200508/DMS_seawater.'       //
+     &           GET_NAME_EXT_2D() // '.' // GET_RES_EXT() // '.nc'
+
+      WRITE( 6, 100 ) TRIM( FILENAME )
+ 100  FORMAT( '     - READ_OCEAN_DMS: Reading ', a ) 
+
+      ! Read data
+      CALL NcOp_Rd( IU, TRIM(FILENAME ) )
+      STRT = (/ 1, 1, THISMONTH /)
+      CNT  = (/ IIPAR, JJPAR, 1 /)
+      CALL NcRd( ARRAY, IU, 'DMS_CONC', STRT, CNT )
+      CALL NcCl( IU )
+
+#else
 
       ! File name
       FILENAME = TRIM( DATA_DIR )                         // 
@@ -10285,6 +10310,8 @@
       CALL READ_BPCH2( FILENAME, 'BIOGSRCE',    25, 
      &                 XTAU,      IIPAR,        JJPAR,      
      &                 1,         ARRAY(:,:,1), QUIET=.TRUE. ) 
+
+#endif
 
       ! Cast from REAL*4 to REAL*8 
       CALL TRANSFER_2D( ARRAY(:,:,1), DMSo )
@@ -10304,7 +10331,7 @@
 !\\
 ! !INTERFACE:
 !
-      SUBROUTINE READ_SST( THISMONTH, THISYEAR, State_Met )
+      SUBROUTINE READ_SST( THISMONTH, THISYEAR, State_Met, Input_Opt )
 !
 ! !USES:
 !
@@ -10313,8 +10340,14 @@
       USE CMN_SIZE_MOD
       USE DIRECTORY_MOD,      ONLY : DATA_DIR,        DATA_DIR_1x1
       USE GIGC_State_Met_Mod, ONLY : MetState
+      USE GIGC_Input_Opt_Mod, ONLY : OptInput
       USE REGRID_A2A_MOD,     ONLY : DO_REGRID_A2A
       USE TRANSFER_MOD,       ONLY : TRANSFER_2D
+
+      USE m_netcdf_io_open
+      USE m_netcdf_io_read
+      USE m_netcdf_io_close
+
 !
 ! !INPUT PARAMETERS: 
 !
@@ -10324,6 +10357,7 @@
 ! !INPUT/OUTPUT PARAMETERS:
 !
       TYPE(MetState), INTENT(INOUT) :: State_Met ! Meteorology State object
+      TYPE(OptInput), INTENT(IN)    :: Input_Opt
 !
 ! !REVISION HISTORY:
 !  (1 ) Extracted from old module routine SULFATE_READMON (bmy, 9/18/02)
@@ -10347,12 +10381,14 @@
 ! !LOCAL VARIABLES:
 !
       REAL*4                  :: ARRAY(IIPAR,JJPAR,1)
+      REAL*4                  :: ARRAY2(IIPAR,JJPAR)
       REAL*4                  :: ARRAY1(I1x1,J1x1,1)
       REAL*8                  :: XTAU
       CHARACTER(LEN=4)        :: SYEAR
       CHARACTER(LEN=255)      :: FILENAME
       CHARACTER(LEN=255)      :: LLFILENAME
       REAL*8                  :: INGRID(I1x1,J1x1)
+      INTEGER                 :: fID
 
       !==================================================================
       ! READ_SST begins here!
@@ -10400,6 +10436,17 @@
       ELSE
 #endif
 
+#if defined( GISS )
+
+         CALL NcOp_Rd( fID, TRIM( DATA_DIR ) // 'BGRID/' //
+     &        TRIM(Input_Opt%RUNID) // '.acc.ymonmean.nc' )
+         CALL NcRd( ARRAY2, fID, 'sst', 
+     &        (/1,1,THISMONTH/), (/IIPAR,JJPAR,1/) )
+         CALL NcCl( fID )
+         CALL TRANSFER_2D( ARRAY2, SSTEMP )
+         
+#else
+
          !-------------------------------
          ! Use climatological SST data 
          !-------------------------------
@@ -10422,6 +10469,8 @@
 
          ! Cast from REAL*4 to REAL*8 
          CALL TRANSFER_2D( ARRAY(:,:,1), SSTEMP )
+
+#endif
 
 #if !defined( GISS )
       ENDIF
@@ -11210,6 +11259,10 @@
       USE STREETS_ANTHRO_MOD,   ONLY : GET_STREETS_ANTHRO
       USE TRACERID_MOD,         ONLY : IDTNH3
       USE TRANSFER_MOD,         ONLY : TRANSFER_2D
+
+      USE m_netcdf_io_open
+      USE m_netcdf_io_read
+      USE m_netcdf_io_close
 !
 ! !INPUT PARAMETERS: 
 !
@@ -11243,6 +11296,7 @@
 ! !LOCAL VARIABLES:
 !
       INTEGER                       :: I, J, DAY_NUM
+      INTEGER                       :: STRT(3), CNT(3), IU
       REAL*4                        :: ARRAY(IIPAR,JJPAR,1)
       REAL*8                        :: AREA_CM2, EPA_NEI, XTAU
       REAL*8                        :: XNUMOL(Input_Opt%N_TRACERS)
@@ -11300,6 +11354,25 @@
 
       ELSE
 
+#if defined( GISS )
+
+      ! File name
+      FILENAME = TRIM( DATA_DIR )                         //
+     &           'sulfate_sim_200508/NH3_anthsrce.'       //
+     &           GET_NAME_EXT_2D() // '.' // GET_RES_EXT() // '.nc'
+
+      WRITE( 6, 100 ) TRIM( FILENAME )
+ 100  FORMAT( '     - READ_ANTHRO_NH3: Reading ', a ) 
+
+      ! Read data
+      CALL NcOp_Rd( IU, TRIM(FILENAME ) )
+      STRT = (/ 1, 1, THISMONTH /)
+      CNT  = (/ IIPAR, JJPAR, 1 /)
+      CALL NcRd( ARRAY, IU, 'NH3_ANTH', STRT, CNT )
+      CALL NcCl( IU )
+
+#else
+
          ! File name
          FILENAME = TRIM( DATA_DIR )                         //
      &              'sulfate_sim_200508/NH3_anthsrce.'       //
@@ -11316,6 +11389,8 @@
          CALL READ_BPCH2( FILENAME, 'NH3-ANTH',    29,  
      &                    XTAU,      IIPAR,        JJPAR,       
      &                    1,         ARRAY(:,:,1), QUIET=.TRUE. )
+
+#endif
 
          ! Cast from REAL*4 to REAL*8
          CALL TRANSFER_2D( ARRAY(:,:,1), ENH3_an )
@@ -11393,6 +11468,11 @@
       USE CMN_SIZE_MOD
       USE DIRECTORY_MOD, ONLY : DATA_DIR
       USE TRANSFER_MOD,  ONLY : TRANSFER_2D
+
+      USE m_netcdf_io_open
+      USE m_netcdf_io_read
+      USE m_netcdf_io_close
+
 !
 ! !INPUT PARAMETERS: 
 !
@@ -11418,10 +11498,30 @@
      &                                      31d0, 30d0, 31d0, 31d0, 
      &                                      30d0, 31d0, 30d0, 31d0 /)
       CHARACTER(LEN=255)  :: FILENAME
+      INTEGER             :: STRT(3), CNT(3), IU
 
       !=================================================================
       ! READ_NATURAL_NH3 begins here!
       !=================================================================
+
+#if defined( GISS )
+
+      ! File name
+      FILENAME = TRIM( DATA_DIR )                         //
+     &           'sulfate_sim_200508/NH3_natusrce.'       // 
+     &           GET_NAME_EXT_2D() // '.' // GET_RES_EXT() // '.nc'
+
+      WRITE( 6, 100 ) TRIM( FILENAME )
+ 100  FORMAT( '     - READ_NATURAL_NH3: Reading ', a ) 
+
+      ! Read data
+      CALL NcOp_Rd( IU, TRIM(FILENAME ) )
+      STRT = (/ 1, 1, THISMONTH /)
+      CNT  = (/ IIPAR, JJPAR, 1 /)
+      CALL NcRd( ARRAY, IU, 'NH3_NATU', STRT, CNT )
+      CALL NcCl( IU )
+
+#else
 
       ! File name
       FILENAME = TRIM( DATA_DIR )                         //
@@ -11439,6 +11539,8 @@
       CALL READ_BPCH2( FILENAME, 'NH3-NATU',    29,  
      &                 XTAU,      IIPAR,        JJPAR,       
      &                 1,         ARRAY(:,:,1), QUIET=.TRUE. )
+
+#endif
 
       ! Cast from REAL*4 to REAL*8
       CALL TRANSFER_2D( ARRAY(:,:,1), ENH3_na )
@@ -11479,6 +11581,9 @@
       USE TRACERID_MOD,         ONLY : IDTNH3
       USE TRANSFER_MOD,         ONLY : TRANSFER_2D
 
+      USE m_netcdf_io_open
+      USE m_netcdf_io_read
+      USE m_netcdf_io_close
 !
 ! !INPUT PARAMETERS: 
 !
@@ -11532,6 +11637,7 @@
      &                                               31d0, 30d0, 31d0/)
       CHARACTER(LEN=4  )            :: CYEAR
       CHARACTER(LEN=255)            :: FILENAME
+      INTEGER                       :: STRT(3), CNT(3), IU
 
       !=================================================================
       ! READ_BIOFUEL_NH3 begins here!
@@ -11540,6 +11646,25 @@
       !=================================================================
       ! Read NH3 biofuel emissions
       !=================================================================
+
+#if defined( GISS )
+
+      ! File name
+      FILENAME = TRIM( DATA_DIR )                         //
+     &           'sulfate_sim_200508/NH3_biofuel.'        // 
+     &           GET_NAME_EXT_2D() // '.' // GET_RES_EXT() // '.nc'
+
+      WRITE( 6, 100 ) TRIM( FILENAME )
+ 100  FORMAT( '     - READ_BIOFUEL_NH3: Reading ', a ) 
+
+      ! Read data
+      CALL NcOp_Rd( IU, TRIM(FILENAME ) )
+      STRT = (/ 1, 1, THISMONTH /)
+      CNT  = (/ IIPAR, JJPAR, 1 /)
+      CALL NcRd( ARRAY, IU, 'NH3_BIOF', STRT, CNT )
+      CALL NcCl( IU )
+
+#else
 
       ! File name
       FILENAME = TRIM( DATA_DIR )                         // 
@@ -11557,6 +11682,8 @@
       CALL READ_BPCH2( FILENAME, 'BIOFSRCE',    29, 
      &                 XTAU,      IIPAR,        JJPAR,       
      &                 1,         ARRAY(:,:,1), QUIET=.TRUE. )
+
+#endif
  
       ! Cast from REAL*4 to REAL*8 and resize if necesary
       CALL TRANSFER_2D( ARRAY(:,:,1), ENH3_bf )

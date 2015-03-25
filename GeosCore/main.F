@@ -531,14 +531,19 @@
 
       ! Initialize the derived type object containing
       ! mapping information for the MODIS LAI routines
-#if defined( MODELE )
-         ! GISS landcover maps are on BIOME4-TG grid (0.5 x 0.5 "generic")
-         CALL Init_Mapping(  720, 360, IIPAR, JJPAR, mapping )
+#if defined( GISS ) && defined( ICECAP )
+      ! ICECAP landcover maps are on BIOME4-TG grid (0.5 x 0.5 "generic")
+      CALL Init_Mapping( am_I_Root, Input_Opt,
+     &                   720, 360, IIPAR, JJPAR, mapping, RC )
 #else
+      ! Initialize the derived type object containing
+      ! mapping information for the MODIS LAI routines
       IF ( USE_OLSON_2001 ) THEN
-         CALL Init_Mapping( 1440, 720, IIPAR, JJPAR, mapping )
+         CALL Init_Mapping( am_I_Root, Input_Opt,
+     &                      1440, 720, IIPAR, JJPAR, mapping, RC )
       ELSE
-         CALL Init_Mapping(  720, 360, IIPAR, JJPAR, mapping )
+         CALL Init_Mapping( am_I_Root, Input_Opt,
+     &                       720, 360, IIPAR, JJPAR, mapping, RC )
       ENDIF
 #endif
 
@@ -818,7 +823,7 @@
      &           ITS_A_CH3I_SIM     ) THEN
 
                ! Read UV albedoes for FAST-J
-               CALL READ_UVALBEDO( MONTH, State_Met )
+               CALL READ_UVALBEDO( MONTH, State_Met, Input_Opt )
 
 #if !defined( GISS )
                ! Read TOMS overhead O3 columns for FAST-J
@@ -1516,8 +1521,11 @@
       ! Deallocate dynamic module arrays
       CALL CLEANUP( am_I_Root, RC )
 
+      ! Model crashes, claiming invalid next size. Compiler issue?
+#ifndef GISS
       ! Deallocate the derived type object w/ mapping info
       CALL CLEANUP_MAPPING( mapping )
+#endif
 
 #if defined( GTMM_Hg )
       ! Deallocate arrays from GTMM model for mercury simulation

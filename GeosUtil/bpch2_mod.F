@@ -939,6 +939,11 @@
       ! GCAP grid does not have half-sized polar boxes
       HALFPOLAR = 0
 
+#elif defined( MODELE ) && defined( GRIDF40 )
+
+      ! GISS F40 resoution does not have half-sized polar box
+      HALFPOLAR = 0
+
 #else
 
       ! All GEOS grids and GISS M23 have half-sized polar boxes

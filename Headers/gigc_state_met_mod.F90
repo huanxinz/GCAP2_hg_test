@@ -55,13 +55,13 @@ MODULE GIGC_State_Met_Mod
      REAL*8,  POINTER :: GRN       (:,:  )  ! Greenness fraction
      REAL*8,  POINTER :: GWETROOT  (:,:  )  ! Root soil wetness [1]
      REAL*8,  POINTER :: GWETTOP   (:,:  )  ! Top soil moisture [1]
+     REAL*8,  POINTER :: HLAKE     (:,:  )  !
      REAL*8,  POINTER :: HFLUX     (:,:  )  ! Sensible heat flux [W/m2]
      REAL*8,  POINTER :: LAI       (:,:  )  ! Leaf area index [m2/m2]
 #if defined( ICECAP ) 
      REAL*8,  POINTER :: LGM_ICE   (:,:  )  ! LGM Ice Fraction
 #endif
      REAL*8,  POINTER :: LWI       (:,:  )  ! Land/water indices [1]
-     REAL*8,  POINTER :: LWI_GISS  (:,:  )  ! Land fraction [1]
      REAL*8,  POINTER :: MOLENGTH  (:,:  )  ! Monin-Obhukov length [m]
      REAL*8,  POINTER :: OICE      (:,:  )  ! Fraction of ocean ice [1]
      REAL*8,  POINTER :: PARDR     (:,:  )  ! Direct  photsyn active rad [W/m2]
@@ -115,7 +115,7 @@ MODULE GIGC_State_Met_Mod
      REAL*8,  POINTER :: UVALBEDO  (:,:  )  ! UV surface albedo [1]
      REAL*8,  POINTER :: V10M      (:,:  )  ! N/S wind speed @ 10m height [m/s]
      REAL*8,  POINTER :: Z0        (:,:  )  ! Surface roughness height [m]
-            
+
      !----------------------------------------------------------------------
      ! 3-D Fields                  
      !----------------------------------------------------------------------
@@ -155,10 +155,7 @@ MODULE GIGC_State_Met_Mod
      REAL*8,  POINTER :: PFILSAN   (:,:,:)  ! Dwn flux ice prec:LS+anv [kg/m2/s]
      REAL*8,  POINTER :: PFLCU     (:,:,:)  ! Dwn flux liq prec:conv [kg/m2/s]
      REAL*8,  POINTER :: PFLLSAN   (:,:,:)  ! Dwn flux ice prec:LS+anv [kg/m2/s]
-#if !defined( QUS )
-     ! See if others will change PV to ZETA (after Greek symbol for pot vort)
      REAL*8,  POINTER :: PV        (:,:,:)  ! Potential vort [kg*m2/kg/s]
-#endif
      REAL*8,  POINTER :: QI        (:,:,:)  ! Ice mixing ratio [kg/kg]
      REAL*8,  POINTER :: QL        (:,:,:)  ! Water mixing ratio [kg/kg]
      REAL*8,  POINTER :: REEVAPCN  (:,:,:)  ! Evap of precip conv [kg/kg/s]
@@ -182,9 +179,9 @@ MODULE GIGC_State_Met_Mod
      REAL*8,  POINTER :: ZMMD      (:,:,:)  ! Z/M downdraft mass flux [Pa/s]
      REAL*8,  POINTER :: ZMMU      (:,:,:)  ! Z/M updraft   mass flux [Pa/s]
 #if defined( GISS ) && defined( QUS )
-     REAL*8,  POINTER :: PU        (:,:,:)  ! E/W air mass flux [mb.m2/s]
-     REAL*8,  POINTER :: PV        (:,:,:)  ! N/S air mass flux [mb.m2/s]
-     REAL*8,  POINTER :: CONV      (:,:,:)  ! U/D mass fluxes [mb.m2/s]
+     REAL*8,  POINTER :: PUA       (:,:,:)  ! E/W air mass flux [mb.m2/s]
+     REAL*8,  POINTER :: PVA       (:,:,:)  ! N/S air mass flux [mb.m2/s]
+     REAL*8,  POINTER :: SDA       (:,:,:)  ! U/D mass fluxes [mb.m2/s]
 #endif
 
      !----------------------------------------------------------------------
@@ -470,9 +467,6 @@ CONTAINS
     !=======================================================================
     ! GISS met fields
     !=======================================================================
-    ALLOCATE( State_Met%LWI_GISS  ( IM, JM ), STAT=RC )
-    IF ( RC /= GIGC_SUCCESS ) RETURN
-    State_Met%LWI_GISS = 0d0
 
     ALLOCATE( State_Met%MOLENGTH  ( IM, JM ), STAT=RC )
     IF ( RC /= GIGC_SUCCESS ) RETURN
@@ -787,17 +781,17 @@ CONTAINS
 
 #if defined( QUS )
 
-    ALLOCATE( State_Met%PU        ( IM, JM, LM   ), STAT=RC )
+    ALLOCATE( State_Met%PUA        ( IM, JM, LM   ), STAT=RC )
     IF ( RC /= GIGC_SUCCESS ) RETURN           
-    State_Met%PU      = 0d0
+    State_Met%PUA     = 0d0
 
-    ALLOCATE( State_Met%PV        ( IM, JM, LM   ), STAT=RC )
+    ALLOCATE( State_Met%PVA        ( IM, JM, LM   ), STAT=RC )
     IF ( RC /= GIGC_SUCCESS ) RETURN           
-    State_Met%PV      = 0d0
+    State_Met%PVA     = 0d0
 
-    ALLOCATE( State_Met%CONV      ( IM, JM, LM   ), STAT=RC )
+    ALLOCATE( State_Met%SDA      ( IM, JM, LM-1   ), STAT=RC )
     IF ( RC /= GIGC_SUCCESS ) RETURN           
-    State_Met%CONV    = 0d0
+    State_Met%SDA     = 0d0
 
 #endif
 
@@ -1053,14 +1047,14 @@ CONTAINS
     !========================================================================
 
     ! 2-D fields
-    IF ( ASSOCIATED( State_Met%LWI_GISS   )) DEALLOCATE( State_Met%LWI_GISS   )
     IF ( ASSOCIATED( State_Met%MOLENGTH   )) DEALLOCATE( State_Met%MOLENGTH   )
     IF ( ASSOCIATED( State_Met%OICE       )) DEALLOCATE( State_Met%OICE       )
     IF ( ASSOCIATED( State_Met%SNICE      )) DEALLOCATE( State_Met%SNICE      )
     IF ( ASSOCIATED( State_Met%SNOW       )) DEALLOCATE( State_Met%SNOW       )
     IF ( ASSOCIATED( State_Met%TROPP1     )) DEALLOCATE( State_Met%TROPP1     )
     IF ( ASSOCIATED( State_Met%TROPP2     )) DEALLOCATE( State_Met%TROPP2     )
-
+    IF ( ASSOCIATED( State_Met%HLAKE      )) DEALLOCATE( State_Met%HLAKE      )
+ 
     ! 3-D fields
     IF ( ASSOCIATED( State_Met%DETRAINE   )) DEALLOCATE( State_Met%DETRAINE   )
     IF ( ASSOCIATED( State_Met%DETRAINN   )) DEALLOCATE( State_Met%DETRAINN   )
@@ -1069,7 +1063,7 @@ CONTAINS
     IF ( ASSOCIATED( State_Met%ENTRAIN    )) DEALLOCATE( State_Met%ENTRAIN    )
     IF ( ASSOCIATED( State_Met%UPDE       )) DEALLOCATE( State_Met%UPDE       )
     IF ( ASSOCIATED( State_Met%UPDN       )) DEALLOCATE( State_Met%UPDN       )
-
+ 
 #if defined( MODELE )
     ! Extra convection fields for ModelE
     IF ( ASSOCIATED( State_Met%C_ED1      )) DEALLOCATE( State_Met%C_ED1      )
@@ -1078,13 +1072,13 @@ CONTAINS
     IF ( ASSOCIATED( State_Met%C_OD1      )) DEALLOCATE( State_Met%C_OD1      )
     IF ( ASSOCIATED( State_Met%C_OD2      )) DEALLOCATE( State_Met%C_OD2      )
 #endif
-
+ 
 #if defined( QUS )
-    IF ( ASSOCIATED( State_Met%PU         )) DEALLOCATE( State_Met%PU         )
-    IF ( ASSOCIATED( State_Met%PV         )) DEALLOCATE( State_Met%PV         )
-    IF ( ASSOCIATED( State_Met%CONV       )) DEALLOCATE( State_Met%CONV       )
+    IF ( ASSOCIATED( State_Met%PUA        )) DEALLOCATE( State_Met%PUA        )
+    IF ( ASSOCIATED( State_Met%PVA        )) DEALLOCATE( State_Met%PVA        )
+    IF ( ASSOCIATED( State_Met%SDA        )) DEALLOCATE( State_Met%SDA        )
 #endif
-
+ 
 #if defined( ICECAP )
     IF ( ASSOCIATED( State_Met%LGM_ICE    )) DEALLOCATE( State_Met%LGM_ICE    )
 #endif
@@ -1157,7 +1151,11 @@ CONTAINS
     ! Land type and leaf area index (LAI) fields for dry deposition
     !========================================================================
     IF ( ASSOCIATED( State_Met%IREG       )) DEALLOCATE( State_Met%IREG       )
+#ifndef GISS
+    ! ltm: Crashes with GISS for some reason, claims pointer already freed
+    ! Compiler issue?
     IF ( ASSOCIATED( State_Met%ILAND      )) DEALLOCATE( State_Met%ILAND      )
+#endif
     IF ( ASSOCIATED( State_Met%IUSE       )) DEALLOCATE( State_Met%IUSE       )
     IF ( ASSOCIATED( State_Met%XLAI       )) DEALLOCATE( State_Met%XLAI       )
     IF ( ASSOCIATED( State_Met%XLAI2      )) DEALLOCATE( State_Met%XLAI2      )

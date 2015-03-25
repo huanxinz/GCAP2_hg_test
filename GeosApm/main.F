@@ -853,7 +853,7 @@
      &           ITS_A_CH3I_SIM     ) THEN
 
                ! Read UV albedoes for FAST-J
-               CALL READ_UVALBEDO( MONTH, State_Met )
+               CALL READ_UVALBEDO( MONTH, State_Met, Input_Opt )
 
                ! Read TOMS overhead O3 columns for FAST-J
                CALL READ_TOMS( MONTH, YEAR, Input_Opt%USE_O3_FROM_MET )

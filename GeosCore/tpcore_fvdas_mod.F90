@@ -297,14 +297,16 @@ CONTAINS
     sine(jm+1)    = 1.0d0
     SINE_25(JM+1) = 1.0d0
     
-    ! Polar cap (S. Pole)
-    dlat(1) = 2.d0*(elat(2) - elat(1))  
-    do j=2,jm-1
+    do j=1,jm
        dlat(j) = elat(j+1) - elat(j)
     enddo
 
+#ifndef GRIDF40
+    ! Polar cap (S. Pole)
+    dlat(1) = 2.d0*(elat(2) - elat(1))  
     ! Polar cap (N. Pole)
     dlat(jm) = 2.0d0*(elat(jm+1) - elat(jm))    
+#endif
     
     do j=1,jm
        gw(j)     = sine(j+1) - sine(j)
@@ -313,7 +315,7 @@ CONTAINS
        dtdx5(j)  = 0.5d0 * dt / (dlon*ae*cosp(j))
        dtdy5(j)  = 0.5d0 * dt / (ae*dlat(j))
     enddo
-      
+
     ! Echo info to stdout
     WRITE( 6, '(a)' ) REPEAT( '=', 79 )
     WRITE( 6, '(a)' ) &

@@ -1096,7 +1096,7 @@
       NMONTHS_LINOZ  = Input_Opt%LINOZ_NMONTHS
 
       ! Filename
-#if defined( MODELE )
+#if defined( ICECAP )
 
       THISYEAR = GET_YEAR()      
       FILENAME = TRIM( DATA_DIR_1x1 ) // 'Linoz_200908/'

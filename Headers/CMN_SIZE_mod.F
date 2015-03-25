@@ -130,7 +130,7 @@
       INTEGER            :: IIPAR
       INTEGER            :: JJPAR
       INTEGER            :: LLPAR
-      INTEGER, PARAMETER :: LLTROP     = 29
+      INTEGER, PARAMETER :: LLTROP     = 30
       INTEGER, PARAMETER :: LLTROP_FIX = LLTROP
       INTEGER, PARAMETER :: LLSTRAT    = 37    ! Stratopause = 1mb
       REAL*8,  PARAMETER :: PSFMPT     = 834d0 ! Ps (984d0) - PTOP

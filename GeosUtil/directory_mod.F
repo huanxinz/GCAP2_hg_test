@@ -30,6 +30,7 @@
       CHARACTER(LEN=255) :: GEOS_FP_DIR   ! Subdir for GEOS-FP met data
       CHARACTER(LEN=255) :: MERRA_DIR     ! Subdir for MERRA  met data
       CHARACTER(LEN=255) :: TEMP_DIR      ! Temp dir for unzipping met data
+      CHARACTER(LEN=255) :: RUNID         ! GISS Model RunID
       CHARACTER(LEN=255) :: RUN_DIR       ! Run directory for GEOS-Chem
       CHARACTER(LEN=255) :: OH_DIR        ! Dir w/ mean OH files
       CHARACTER(LEN=225) :: BC_DIR        ! Dir w/ mean BC files

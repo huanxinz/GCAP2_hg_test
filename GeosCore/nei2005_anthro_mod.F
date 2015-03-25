@@ -501,7 +501,7 @@
 
 #if   defined( GEOS_5 ) || defined( MERRA ) || defined( GEOS_FP )
       SNAME = 'GEOS5'
-#elif defined( GCAP  )
+#elif defined( GISS ) || defined( GCAP  )
       SNAME = 'GEOS4'
 #elif defined( GEOS_4 )
       SNAME = 'GEOS4'
