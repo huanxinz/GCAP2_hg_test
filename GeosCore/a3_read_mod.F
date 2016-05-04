@@ -152,8 +152,8 @@
 
          ! Strings for directory & filename
          GEOS_DIR = TRIM( Input_Opt%GISS_DIR )
-         A3_STR   = 'YYYYMMDD.a3.' // GET_RES_EXT()
-
+         A3_STR   = 'YYYYMMDD.aijh6' // TRIM(Input_Opt%RUNID)//'.nc'
+    
 #endif
 
          ! Replace date tokens
@@ -195,7 +195,7 @@
       !=================================================================
       REMOVE_ALL = TRIM( Input_Opt%REMOVE_CMD     ) // ' '    // 
      &             TRIM( Input_Opt%TEMP_DIR       ) // 
-     &             TRIM( Input_Opt%WILD_CARD      ) // '.a3.' // 
+     &             TRIM( Input_Opt%WILD_CARD      ) // '.aijh6.' // 
      &             TRIM( Input_Opt%WILD_CARD      ) 
 
       !=================================================================
